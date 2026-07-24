@@ -1,0 +1,44 @@
+app:
+  title: Enterprise Developer Portal
+  baseUrl: ${BACKSTAGE_BASE_URL}
+
+organization:
+  name: Enterprise Platform
+
+backend:
+  baseUrl: ${BACKSTAGE_BASE_URL}
+  listen:
+    host: 0.0.0.0
+    port: ${PORT}
+  cors:
+    origin: ${BACKSTAGE_BASE_URL}
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+
+  database:
+    client: better-sqlite3
+    connection: /home/data/backstage.db
+
+auth:
+  environment: production
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Template, User, Group]
+
+  locations:
+    - type: file
+      target: ./examples/entities.yaml
+
+    - type: file
+      target: ./examples/org.yaml
+      rules:
+        - allow: [User, Group]
+
+    - type: file
+      target: ./examples/infrastructure-template/template.yaml
+      rules:
+        - allow: [Template]
