@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 env:
-  NODE_VERSION: '24'
-  BACKSTAGE_DIR: backstage
-  AZURE_WEBAPP_NAME: backstage-pranab-mvp
+  NODE_VERSION: "24"
+  BACKSTAGE_DIR: "backstage"
+  AZURE_WEBAPP_NAME: "backstage-pranab-mvp"
 
 jobs:
   build-and-deploy:
@@ -22,7 +22,7 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Setup Node.js
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -33,34 +33,50 @@ jobs:
         working-directory: ${{ env.BACKSTAGE_DIR }}
         run: yarn install --immutable
 
-      - name: Build Backstage production backend
+      - name: Build Backstage production bundle
         working-directory: ${{ env.BACKSTAGE_DIR }}
         run: yarn build:backend
 
-      - name: Prepare App Service deployment package
+      - name: Prepare production deployment
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf deploy-out backstage-appservice.zip
-          mkdir -p deploy-out/backstage
 
-          cp -R backstage/examples deploy-out/backstage/
-          cp backstage/app-config.yaml deploy-out/backstage/
-          cp backstage/app-config.production.appservice.yaml deploy-out/backstage/
-          cp -R backstage/deploy deploy-out/backstage/
+          rm -rf "${{ runner.temp }}/backstage-deploy"
+          mkdir -p "${{ runner.temp }}/backstage-deploy"
 
-          tar -xzf backstage/packages/backend/dist/bundle.tar.gz -C deploy-out/backstage
+          tar -xzf backstage/packages/backend/dist/bundle.tar.gz             -C "${{ runner.temp }}/backstage-deploy"
 
-          cd deploy-out/backstage
+          cp backstage/app-config.yaml             "${{ runner.temp }}/backstage-deploy/app-config.yaml"
+
+          cp backstage/app-config.production.appservice.yaml             "${{ runner.temp }}/backstage-deploy/app-config.production.appservice.yaml"
+
+          mkdir -p "${{ runner.temp }}/backstage-deploy/deploy"
+          cp backstage/deploy/startup.sh             "${{ runner.temp }}/backstage-deploy/deploy/startup.sh"
+          chmod +x "${{ runner.temp }}/backstage-deploy/deploy/startup.sh"
+
+          mkdir -p "${{ runner.temp }}/backstage-deploy/examples/infrastructure-template"
+          cp backstage/examples/infrastructure-template/template.yaml             "${{ runner.temp }}/backstage-deploy/examples/infrastructure-template/template.yaml"
+
+          cd "${{ runner.temp }}/backstage-deploy"
           corepack enable
-          yarn workspaces focus --all --production
+          yarn install --immutable
 
-          cd ..
-          zip -r ../backstage-appservice.zip .
+          # Replace the bundle root start script with the App Service startup command.
+          node - <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.scripts = pkg.scripts || {};
+          pkg.scripts.start = 'bash deploy/startup.sh';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+
+          zip -qr "${{ github.workspace }}/backstage-appservice.zip" .
 
       - name: Deploy Backstage to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          slot-name: "Production"
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BB60165ACCCD4F3EB8AD10FD8D3BF808 }}
           package: backstage-appservice.zip

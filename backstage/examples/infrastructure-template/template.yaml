@@ -14,42 +14,26 @@ spec:
 
   parameters:
     - title: Project Information
-      required:
-        - projectName
-        - environment
+      required: [projectName, environment]
       properties:
         projectName:
           title: Project Name
           type: string
-          description: Enter the project or application name
         environment:
           title: Environment
           type: string
-          enum:
-            - Development
-            - Test
-            - Build
-            - Sandbox
+          enum: [Development, Test, Build, Sandbox]
 
     - title: Choose Platform
-      required:
-        - platform
+      required: [platform]
       properties:
         platform:
           title: Cloud / Platform
           type: string
-          enum:
-            - Azure
-            - AWS
-            - Azure Local
-            - Hyper-V
+          enum: [Azure, AWS, Azure Local, Hyper-V]
 
     - title: Infrastructure Requirements
-      required:
-        - region
-        - operatingSystem
-        - vmSize
-        - vmCount
+      required: [region, operatingSystem, vmSize, vmCount]
       properties:
         region:
           title: Region / Location
@@ -85,13 +69,7 @@ spec:
         lifetime:
           title: Environment Lifetime
           type: string
-          enum:
-            - 8 Hours
-            - 1 Day
-            - 3 Days
-            - 7 Days
-            - 30 Days
-            - Permanent
+          enum: [8 Hours, 1 Day, 3 Days, 7 Days, 30 Days, Permanent]
         autoCleanup:
           title: Automatically delete environment after expiry
           type: boolean
@@ -111,19 +89,10 @@ spec:
           OS: ${{ parameters.operatingSystem }}
           VM Size: ${{ parameters.vmSize }}
           VM Count: ${{ parameters.vmCount }}
-          Cost Center: ${{ parameters.costCenter }}
-          Owner: ${{ parameters.owner }}
-          Lifetime: ${{ parameters.lifetime }}
-          Auto Cleanup: ${{ parameters.autoCleanup }}
 
   output:
     text:
       - title: Request Status
         content: |
           Infrastructure request validated successfully.
-
-          Project: ${{ parameters.projectName }}
-          Platform: ${{ parameters.platform }}
-          Environment: ${{ parameters.environment }}
-
           MVP Mode: No real infrastructure is deployed yet.

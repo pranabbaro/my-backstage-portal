@@ -1,5 +1,6 @@
-template_yaml: PASS
-production_yaml: PASS
-workflow_yaml: PASS
-startup_bash: PASS
-required_files: PASS
+YAML syntax: PASS
+startup.sh syntax: PASS
+existing Azure secret reference: PASS
+Backstage build path: PASS
+build:backend: PASS
+old workflow removal script: PASS
