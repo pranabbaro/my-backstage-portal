@@ -2,70 +2,65 @@ name: Deploy Backstage to Azure App Service
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
-
-permissions:
-  contents: read
-  id-token: write
 
 env:
   NODE_VERSION: '24'
   BACKSTAGE_DIR: backstage
+  AZURE_WEBAPP_NAME: backstage-pranab-mvp
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
           cache-dependency-path: backstage/yarn.lock
 
-      - name: Install dependencies
+      - name: Install Backstage dependencies
         working-directory: ${{ env.BACKSTAGE_DIR }}
         run: yarn install --immutable
 
-      - name: Build Backstage backend bundle
+      - name: Build Backstage production backend
         working-directory: ${{ env.BACKSTAGE_DIR }}
         run: yarn build:backend
 
-      - name: Prepare deploy folder
+      - name: Prepare App Service deployment package
+        shell: bash
         run: |
-          rm -rf deploy-out
+          set -euo pipefail
+          rm -rf deploy-out backstage-appservice.zip
           mkdir -p deploy-out/backstage
+
           cp -R backstage/examples deploy-out/backstage/
           cp backstage/app-config.yaml deploy-out/backstage/
           cp backstage/app-config.production.appservice.yaml deploy-out/backstage/
           cp -R backstage/deploy deploy-out/backstage/
+
           tar -xzf backstage/packages/backend/dist/bundle.tar.gz -C deploy-out/backstage
+
           cd deploy-out/backstage
           corepack enable
           yarn workspaces focus --all --production
 
-      - name: Create deployment zip
-        run: |
-          cd deploy-out
+          cd ..
           zip -r ../backstage-appservice.zip .
 
-      - name: Azure login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy to Azure App Service
+      - name: Deploy Backstage to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: backstage-appservice.zip

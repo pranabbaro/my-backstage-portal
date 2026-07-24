@@ -1,114 +1,110 @@
-# Backstage App Service Ready Pack
+# Final Backstage App Service Pack
 
-This pack is designed for the existing repository:
+This is the consolidated deployment pack for the existing `my-backstage-portal` repository.
 
-`pranabbaro/my-backstage-portal`
+## Included
 
-It does **not** regenerate Backstage. It adds production deployment files to the working source you already pushed.
-
-## What is included
-
-- Native Backstage `Request Infrastructure` software template
-- Azure / AWS / Azure Local / Hyper-V request options
-- Enterprise Developer Portal production configuration
-- Persistent SQLite path for an MVP on Azure App Service
+- Request Infrastructure software template
+- Azure / AWS / Azure Local / Hyper-V request form
+- App Service production config
+- Persistent MVP SQLite path `/home/data/backstage.db`
 - App Service startup script
-- GitHub Actions CI/CD workflow
-- Automatic helper to register the template in your existing `app-config.yaml`
+- GitHub Actions deployment using Azure Publish Profile
+- No Azure Client ID / Tenant ID / Subscription ID / Client Secret required by this workflow
+- Patch helper for the existing Backstage `app-config.yaml`
 
-## Apply it
+## IMPORTANT
 
-Extract this ZIP at the root of your existing `my-backstage-portal` repository.
+This is an overlay for your existing working Backstage repository. Do not replace the entire existing `backstage` directory. Merge these files into it.
 
-The final layout should include:
+## 1. Copy into your repo
 
-```
+Final repo should contain:
+
+```text
 my-backstage-portal/
 ├── .github/
 │   └── workflows/
 │       └── deploy-backstage-appservice.yml
-├── apply_to_existing_repo.py
+├── apply_final_pack.py
 └── backstage/
     ├── app-config.yaml
     ├── app-config.production.appservice.yaml
-    ├── examples/
-    │   └── infrastructure-template/
-    │       └── template.yaml
-    └── deploy/
-        └── startup.sh
+    ├── deploy/
+    │   └── startup.sh
+    └── examples/
+        └── infrastructure-template/
+            └── template.yaml
 ```
 
-Then run:
+## 2. Register template
 
-```bash
-python3 apply_to_existing_repo.py
-cd backstage
-yarn install --immutable
-yarn build:backend
+From repository root:
+
+```powershell
+python apply_final_pack.py
 ```
 
-Commit:
+## 3. Commit
 
-```bash
-cd ..
+```powershell
 git add .
-git commit -m "Add App Service deployment and infrastructure template"
+git commit -m "Deploy final Backstage MVP to App Service"
+git pull --rebase origin main
 git push origin main
 ```
 
-## Azure App Service settings
+## 4. GitHub secret
 
-Create a Linux App Service with Node.js 24.
+Repository -> Settings -> Secrets and variables -> Actions -> New repository secret
 
-Set these App Settings:
+Name:
 
-- `BACKSTAGE_BASE_URL=https://<YOUR-APP-NAME>.azurewebsites.net`
-- `PORT=8080`
-- `NODE_ENV=production`
+`AZURE_WEBAPP_PUBLISH_PROFILE`
 
-Set the Startup Command to:
+Value:
+
+Paste the complete Azure App Service publish profile XML.
+
+## 5. Azure App Service configuration
+
+App Service name expected by workflow:
+
+`backstage-pranab-mvp`
+
+Runtime:
+- Linux
+- Node.js 24
+
+Application settings:
+
+`BACKSTAGE_BASE_URL=https://backstage-pranab-mvp.azurewebsites.net`
+
+`PORT=8080`
+
+`NODE_ENV=production`
+
+Startup command:
 
 ```bash
 bash /home/site/wwwroot/backstage/deploy/startup.sh
 ```
 
-## GitHub Actions secrets
+## 6. Disable old workflow
 
-Configure:
+Disable/delete the older Azure-generated workflow such as:
 
-- `AZURE_CLIENT_ID`
-- `AZURE_TENANT_ID`
-- `AZURE_SUBSCRIPTION_ID`
-- `AZURE_WEBAPP_NAME`
+`main_backstage-pranab-mvp.yml`
 
-The workflow uses Azure OIDC, so configure a federated credential for the GitHub repository in Microsoft Entra ID.
+Keep only:
 
-## MVP database
+`deploy-backstage-appservice.yml`
 
-This pack uses:
+## Validation performed on this pack
 
-`/home/data/backstage.db`
+- YAML syntax parsed successfully
+- Shell startup script syntax checked
+- Required pack files verified
+- GitHub workflow uses Publish Profile authentication rather than OIDC credentials
 
-This is suitable for a single-instance MVP. For production, use Azure Database for PostgreSQL.
-
-## Authentication
-
-Guest auth remains enabled for the MVP. Replace it with Microsoft Entra ID before enterprise production.
-
-## Current MVP flow
-
-User
-→ Enterprise Developer Portal
-→ Create
-→ Request Infrastructure
-→ Validate request
-→ MVP success result
-
-Next phase:
-
-Backstage
-→ ArchMindCanvas
-→ Approval
-→ GitHub / Azure DevOps
-→ Terraform / Bicep
-→ Azure / AWS / Azure Local
+This validation does not execute a live deployment into your Azure subscription.

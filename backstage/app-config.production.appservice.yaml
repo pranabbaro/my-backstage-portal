@@ -14,7 +14,6 @@ backend:
     origin: ${BACKSTAGE_BASE_URL}
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
     credentials: true
-
   database:
     client: better-sqlite3
     connection: /home/data/backstage.db
@@ -28,16 +27,13 @@ auth:
 catalog:
   rules:
     - allow: [Component, System, API, Resource, Location, Template, User, Group]
-
   locations:
     - type: file
       target: ./examples/entities.yaml
-
     - type: file
       target: ./examples/org.yaml
       rules:
         - allow: [User, Group]
-
     - type: file
       target: ./examples/infrastructure-template/template.yaml
       rules:
