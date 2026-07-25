@@ -1,19 +1,22 @@
 app:
   title: Enterprise Developer Portal
-  baseUrl: https://backstage-pranab-mvp.azurewebsites.net
+  baseUrl: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
 
 organization:
   name: Enterprise Platform
 
 backend:
-  baseUrl: https://backstage-pranab-mvp.azurewebsites.net
+  baseUrl: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
+
   listen:
     host: 0.0.0.0
     port: ${PORT}
+
   cors:
-    origin: https://backstage-pranab-mvp.azurewebsites.net
+    origin: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
     credentials: true
+
   database:
     client: better-sqlite3
     connection: /home/data/backstage.db
