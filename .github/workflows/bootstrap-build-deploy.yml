@@ -1,0 +1,127 @@
+name: Bootstrap Build and Deploy Backstage
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "24"
+  BACKSTAGE_CREATE_APP_VERSION: "0.9.0"
+  AZURE_WEBAPP_NAME: "backstage-pranab-mvp"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Generate fresh official Backstage app when source is absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f backstage/package.json ]; then
+            printf 'backstage\n' | npx --yes @backstage/create-app@${{ env.BACKSTAGE_CREATE_APP_VERSION }} --skip-install
+          else
+            echo "Existing Backstage source found; generation skipped."
+          fi
+
+      - name: Apply Enterprise Developer Portal customization
+        run: python3 scripts/customize_backstage.py
+
+      - name: Install dependencies
+        working-directory: backstage
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+
+          # A freshly scaffolded app has a seed lockfile that may need its first
+          # resolution update. Once yarn.lock is committed, later builds are immutable.
+          if git ls-files --error-unmatch yarn.lock >/dev/null 2>&1; then
+            echo "Tracked yarn.lock found; using immutable install."
+            yarn install --immutable
+          else
+            echo "Fresh bootstrap detected; allowing Yarn to finalize yarn.lock once."
+            yarn install --no-immutable
+          fi
+
+      - name: Type check
+        working-directory: backstage
+        run: yarn tsc
+
+      - name: Build production backend and frontend bundle
+        working-directory: backstage
+        env:
+          NODE_ENV: production
+        run: yarn build:backend
+
+      - name: Commit generated full Backstage source to repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add backstage portal-config scripts
+            git commit -m "Bootstrap fresh Backstage source [skip ci]" || true
+            git push origin HEAD:main
+          fi
+
+      - name: Prepare App Service runtime package
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEPLOY="${{ runner.temp }}/backstage-deploy"
+          rm -rf "$DEPLOY" "${{ github.workspace }}/backstage-appservice.zip"
+          mkdir -p "$DEPLOY"
+
+          cp backstage/package.json backstage/yarn.lock "$DEPLOY/"
+          [ -f backstage/.yarnrc.yml ] && cp backstage/.yarnrc.yml "$DEPLOY/" || true
+          [ -f backstage/backstage.json ] && cp backstage/backstage.json "$DEPLOY/" || true
+          [ -d backstage/.yarn ] && cp -R backstage/.yarn "$DEPLOY/.yarn" || true
+
+          tar -xzf backstage/packages/backend/dist/skeleton.tar.gz -C "$DEPLOY"
+          cd "$DEPLOY"
+          corepack enable
+          yarn workspaces focus --all --production
+          tar -xzf "${{ github.workspace }}/backstage/packages/backend/dist/bundle.tar.gz" -C "$DEPLOY"
+
+          cp "${{ github.workspace }}/backstage/app-config.yaml" "$DEPLOY/app-config.yaml"
+          cp "${{ github.workspace }}/backstage/app-config.production.yaml" "$DEPLOY/app-config.production.yaml"
+          cp -R "${{ github.workspace }}/backstage/examples" "$DEPLOY/examples"
+
+          node <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.scripts = pkg.scripts || {};
+          pkg.scripts.start = 'node packages/backend --config app-config.yaml --config app-config.production.yaml';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+
+          zip -qr "${{ github.workspace }}/backstage-appservice.zip" .
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "${{ env.AZURE_WEBAPP_NAME }}"
+          slot-name: "Production"
+          package: backstage-appservice.zip
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BB60165ACCCD4F3EB8AD10FD8D3BF808 }}

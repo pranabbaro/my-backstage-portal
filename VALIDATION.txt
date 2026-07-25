@@ -1,0 +1,11 @@
+Validation
+==========
+Python customizer syntax: PASS
+YAML syntax: PASS
+Static deployment invariants: PASS
+PublishSettings embedded: NO
+
+Network-dependent npm install/build and live Azure deployment cannot be executed in this sandbox because outbound npm/GitHub package access is unavailable; the GitHub Action runs those checks after push.
+Bootstrap lockfile handling: FIXED
+- First generated run: yarn install --no-immutable
+- Subsequent committed runs: yarn install --immutable
