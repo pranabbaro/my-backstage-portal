@@ -1,11 +1,7 @@
-Validation
-==========
-Python customizer syntax: PASS
-YAML syntax: PASS
-Static deployment invariants: PASS
-PublishSettings embedded: NO
+backstage/plugins/cloud-self-service/package.json JSON: PASS
+backstage/plugins/cloud-provisioning-backend/package.json JSON: PASS
+prepare_self_service.py syntax: PASS
+GitHub workflow YAML: PASS
+TypeScript/TSX parser syntax: PASS
 
-Network-dependent npm install/build and live Azure deployment cannot be executed in this sandbox because outbound npm/GitHub package access is unavailable; the GitHub Action runs those checks after push.
-Bootstrap lockfile handling: FIXED
-- First generated run: yarn install --no-immutable
-- Subsequent committed runs: yarn install --immutable
+Live npm install/build/Azure deployment is intentionally performed by GitHub Actions, not on the user's laptop.
