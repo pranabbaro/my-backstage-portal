@@ -1,11 +1,11 @@
-V2 validation
-=============
-Exact dependency-detection failure corrected: PASS
-Yarn 4 lockfile resolver unit test: PASS
-prepare_self_service.py syntax: PASS
-Plugin package JSON: PASS
-GitHub workflow YAML: PASS
+Validation
+==========
+Python customizer syntax: PASS
+YAML syntax: PASS
+Static deployment invariants: PASS
+PublishSettings embedded: NO
 
-Note: This sandbox cannot perform a live npm/GitHub/Azure build because outbound
-network access is unavailable. The GitHub workflow performs the real install,
-type-check, production build, package, and Azure deployment.
+Network-dependent npm install/build and live Azure deployment cannot be executed in this sandbox because outbound npm/GitHub package access is unavailable; the GitHub Action runs those checks after push.
+Bootstrap lockfile handling: FIXED
+- First generated run: yarn install --no-immutable
+- Subsequent committed runs: yarn install --immutable
