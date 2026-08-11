@@ -1,7 +1,11 @@
-backstage/plugins/cloud-self-service/package.json JSON: PASS
-backstage/plugins/cloud-provisioning-backend/package.json JSON: PASS
+V2 validation
+=============
+Exact dependency-detection failure corrected: PASS
+Yarn 4 lockfile resolver unit test: PASS
 prepare_self_service.py syntax: PASS
+Plugin package JSON: PASS
 GitHub workflow YAML: PASS
-TypeScript/TSX parser syntax: PASS
 
-Live npm install/build/Azure deployment is intentionally performed by GitHub Actions, not on the user's laptop.
+Note: This sandbox cannot perform a live npm/GitHub/Azure build because outbound
+network access is unavailable. The GitHub workflow performs the real install,
+type-check, production build, package, and Azure deployment.
