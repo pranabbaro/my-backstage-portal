@@ -19,11 +19,10 @@ backend:
 
   database:
     client: better-sqlite3
-    connection:
-      directory: /home/data
+    connection: /home/data/backstage.db
 
 auth:
   environment: production
   providers:
     guest:
-     dangerouslyAllowOutsideDevelopment: true
+      dangerouslyAllowOutsideDevelopment: true
