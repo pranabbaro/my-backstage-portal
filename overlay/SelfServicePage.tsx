@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Content, Header, InfoCard, Page, Progress } from '@backstage/core-components';
+import { Content, InfoCard, Page, Progress } from '@backstage/core-components';
 import { fetchApiRef, useApi } from '@backstage/frontend-plugin-api';
 
 type ServiceType = 'vm' | 'storage' | 'app-service';
@@ -98,7 +98,7 @@ export const SelfServicePage = () => {
   return (
     <Page themeId="tool">
       <Header
-        title="Azure Self-Service Cloud"
+        title="Self-Service Marketplace"
         subtitle="Deploy approved Azure services from the Enterprise Developer Portal"
       />
       <Content>
