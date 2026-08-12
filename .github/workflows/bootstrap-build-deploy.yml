@@ -1,4 +1,4 @@
-name: Build and Deploy Backstage Recovery
+name: Build and Deploy Backstage Azure Self-Service
 
 on:
   push:
@@ -30,40 +30,12 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Prepare clean Backstage recovery build
-        run: python3 scripts/prepare_recovery.py
+      - name: Apply Azure Self-Service source
+        run: python3 scripts/prepare_self_service.py
 
       - name: Force safe runtime configuration
         shell: bash
         run: |
-          cat > backstage/app-config.yaml <<'EOF'
-          app:
-            title: Enterprise Developer Portal
-            baseUrl: http://localhost:3000
-            packages: all
-            extensions:
-              - page:catalog:
-                  config:
-                    path: /
-
-          organization:
-            name: Enterprise Platform
-
-          auth:
-            environment: development
-            providers:
-              guest: {}
-
-          catalog:
-            rules:
-              - allow: [Component, System, API, Resource, Location, Template]
-            locations:
-              - type: file
-                target: ./examples/infrastructure-template/template.yaml
-                rules:
-                  - allow: [Template]
-          EOF
-
           cat > backstage/app-config.production.yaml <<'EOF'
           app:
             title: Enterprise Developer Portal
@@ -94,9 +66,8 @@ jobs:
                 dangerouslyAllowOutsideDevelopment: true
           EOF
 
-          echo "Checking for forbidden sqlite filename configuration..."
           if grep -R "filename:" backstage/app-config*.yaml; then
-            echo "ERROR: filename-based SQLite config still exists."
+            echo "ERROR: forbidden sqlite filename configuration detected."
             exit 1
           fi
 
@@ -121,10 +92,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           DEPLOY="${{ runner.temp }}/backstage-deploy"
           ZIP="${{ github.workspace }}/backstage-appservice.zip"
-
           rm -rf "$DEPLOY" "$ZIP"
           mkdir -p "$DEPLOY"
 
@@ -156,9 +125,6 @@ jobs:
             'node packages/backend --config app-config.yaml --config app-config.production.yaml';
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           NODE
-
-          echo "Final deployed production config:"
-          cat app-config.production.yaml
 
           if grep -R "filename:" app-config*.yaml; then
             echo "ERROR: unsafe sqlite filename configuration made it into deployment."

@@ -1,12 +1,17 @@
-Validation
-==========
+Validation performed
+====================
 app-config.yaml YAML parse: PASS
 app-config.production.yaml YAML parse: PASS
-GitHub workflow YAML parse: PASS
-Recovery Python syntax: PASS
-No `backend.database` block in production config: PASS
-Correct Azure hostname in production config: PASS
-Workflow contains guard against `filename:` SQLite config: PASS
+GitHub Actions YAML parse: PASS
+Python patch script syntax: PASS
+Correct Azure App Service hostname: PASS
+Production YAML contains no backend.database block: PASS
+Workflow checks for forbidden `filename:` SQLite config: PASS
+Workflow type-checks/builds before Azure deploy: PASS
+Frontend Self-Service component generated: PASS
+Backend Azure Self-Service plugin generated: PASS
 
-The live Backstage build/deployment runs in GitHub Actions because this environment
-does not have access to your GitHub repository secrets or Azure App Service.
+Full TypeScript compilation must run in GitHub Actions because the user's complete
+Backstage repository/dependency graph is not available in this isolated runtime.
+The workflow deliberately builds before deployment, preserving the currently working
+App Service if the extension does not compile.
