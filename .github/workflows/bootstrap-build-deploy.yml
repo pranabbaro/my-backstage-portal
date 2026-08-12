@@ -1,4 +1,4 @@
-name: Bootstrap Build and Deploy Backstage
+name: Build and Deploy Backstage Recovery
 
 on:
   push:
@@ -7,11 +7,10 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   NODE_VERSION: "24"
-  BACKSTAGE_CREATE_APP_VERSION: "0.9.0"
   AZURE_WEBAPP_NAME: "backstage-pranab-mvp"
 
 jobs:
@@ -22,8 +21,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
@@ -33,64 +30,102 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Generate fresh official Backstage app when source is absent
+      - name: Prepare clean Backstage recovery build
+        run: python3 scripts/prepare_recovery.py
+
+      - name: Force safe runtime configuration
         shell: bash
         run: |
-          set -euo pipefail
-          if [ ! -f backstage/package.json ]; then
-            printf 'backstage\n' | npx --yes @backstage/create-app@${{ env.BACKSTAGE_CREATE_APP_VERSION }} --skip-install
-          else
-            echo "Existing Backstage source found; generation skipped."
-          fi
+          cat > backstage/app-config.yaml <<'EOF'
+          app:
+            title: Enterprise Developer Portal
+            baseUrl: http://localhost:3000
+            packages: all
+            extensions:
+              - page:catalog:
+                  config:
+                    path: /
 
-      - name: Apply Enterprise Developer Portal customization
-        run: python3 scripts/customize_backstage.py
+          organization:
+            name: Enterprise Platform
+
+          auth:
+            environment: development
+            providers:
+              guest: {}
+
+          catalog:
+            rules:
+              - allow: [Component, System, API, Resource, Location, Template]
+            locations:
+              - type: file
+                target: ./examples/infrastructure-template/template.yaml
+                rules:
+                  - allow: [Template]
+          EOF
+
+          cat > backstage/app-config.production.yaml <<'EOF'
+          app:
+            title: Enterprise Developer Portal
+            baseUrl: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
+            packages: all
+            extensions:
+              - page:catalog:
+                  config:
+                    path: /
+
+          organization:
+            name: Enterprise Platform
+
+          backend:
+            baseUrl: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
+            listen:
+              host: 0.0.0.0
+              port: ${PORT}
+            cors:
+              origin: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
+              methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+              credentials: true
+
+          auth:
+            environment: production
+            providers:
+              guest:
+                dangerouslyAllowOutsideDevelopment: true
+          EOF
+
+          echo "Checking for forbidden sqlite filename configuration..."
+          if grep -R "filename:" backstage/app-config*.yaml; then
+            echo "ERROR: filename-based SQLite config still exists."
+            exit 1
+          fi
 
       - name: Install dependencies
         working-directory: backstage
-        shell: bash
         run: |
           set -euo pipefail
           corepack enable
-
-          # A freshly scaffolded app has a seed lockfile that may need its first
-          # resolution update. Once yarn.lock is committed, later builds are immutable.
-          if git ls-files --error-unmatch yarn.lock >/dev/null 2>&1; then
-            echo "Tracked yarn.lock found; using immutable install."
-            yarn install --immutable
-          else
-            echo "Fresh bootstrap detected; allowing Yarn to finalize yarn.lock once."
-            yarn install --no-immutable
-          fi
+          yarn install --no-immutable
 
       - name: Type check
         working-directory: backstage
         run: yarn tsc
 
-      - name: Build production backend and frontend bundle
+      - name: Build production backend and frontend
         working-directory: backstage
         env:
           NODE_ENV: production
         run: yarn build:backend
 
-      - name: Commit generated full Backstage source to repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add backstage portal-config scripts
-            git commit -m "Bootstrap fresh Backstage source [skip ci]" || true
-            git push origin HEAD:main
-          fi
-
       - name: Prepare App Service runtime package
         shell: bash
         run: |
           set -euo pipefail
+
           DEPLOY="${{ runner.temp }}/backstage-deploy"
-          rm -rf "$DEPLOY" "${{ github.workspace }}/backstage-appservice.zip"
+          ZIP="${{ github.workspace }}/backstage-appservice.zip"
+
+          rm -rf "$DEPLOY" "$ZIP"
           mkdir -p "$DEPLOY"
 
           cp backstage/package.json backstage/yarn.lock "$DEPLOY/"
@@ -99,24 +134,38 @@ jobs:
           [ -d backstage/.yarn ] && cp -R backstage/.yarn "$DEPLOY/.yarn" || true
 
           tar -xzf backstage/packages/backend/dist/skeleton.tar.gz -C "$DEPLOY"
+
           cd "$DEPLOY"
           corepack enable
           yarn workspaces focus --all --production
+
           tar -xzf "${{ github.workspace }}/backstage/packages/backend/dist/bundle.tar.gz" -C "$DEPLOY"
 
           cp "${{ github.workspace }}/backstage/app-config.yaml" "$DEPLOY/app-config.yaml"
           cp "${{ github.workspace }}/backstage/app-config.production.yaml" "$DEPLOY/app-config.production.yaml"
-          cp -R "${{ github.workspace }}/backstage/examples" "$DEPLOY/examples"
+
+          if [ -d "${{ github.workspace }}/backstage/examples" ]; then
+            cp -R "${{ github.workspace }}/backstage/examples" "$DEPLOY/examples"
+          fi
 
           node <<'NODE'
           const fs = require('fs');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           pkg.scripts = pkg.scripts || {};
-          pkg.scripts.start = 'node packages/backend --config app-config.yaml --config app-config.production.yaml';
+          pkg.scripts.start =
+            'node packages/backend --config app-config.yaml --config app-config.production.yaml';
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           NODE
 
-          zip -qr "${{ github.workspace }}/backstage-appservice.zip" .
+          echo "Final deployed production config:"
+          cat app-config.production.yaml
+
+          if grep -R "filename:" app-config*.yaml; then
+            echo "ERROR: unsafe sqlite filename configuration made it into deployment."
+            exit 1
+          fi
+
+          zip -qr "$ZIP" .
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3

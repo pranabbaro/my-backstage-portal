@@ -1,0 +1,20 @@
+[33m914a7dc[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix Azure Self-Service Cloud
+[33m5a4468d[m Add custom Azure Self-Service Cloud
+[33m683e14a[m Bootstrap fresh Backstage source [skip ci]
+[33m80f3352[m Fix Backstage SQLite configuration
+[33mbd028a1[m Bootstrap fresh Backstage source [skip ci]
+[33m3f64ebf[m Update Backstage App Service URL
+[33mb6341c3[m Bootstrap fresh Backstage source [skip ci]
+[33m14aa0b9[m Replace with corrected Backstage deployment package
+[33mc01d293[m Delete VALIDATION.txt
+[33mac4a458[m Delete INSTALL-INTO-REPO.ps1
+[33m85c1069[m Delete README.md
+[33me402b36[m Delete backstage directory
+[33mced3e2a[m Delete .github/workflows directory
+[33mae14446[m Final Backstage App Service deployment
+[33m6b62587[m Add or update the Azure App Service build and deployment workflow config
+[33mc810b49[m backstage-appservice-ready-pack-final
+[33m5c30992[m Remove the Azure App Service build and deployment workflow config
+[33m2057abb[m Add App Service deployment and infrastructure template
+[33m06657cf[m Working Backstage baseline
+[33m24a06f8[m Add or update the Azure App Service build and deployment workflow config
