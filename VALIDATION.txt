@@ -1,17 +1,19 @@
 Validation performed
 ====================
-app-config.yaml YAML parse: PASS
-app-config.production.yaml YAML parse: PASS
+Corrected expected frontend structure: PASS
+  packages/app/src/App.tsx
+  packages/app/src/modules/nav/Sidebar.tsx
+
+Recovery YAML parse: PASS
+Production YAML parse: PASS
 GitHub Actions YAML parse: PASS
 Python patch script syntax: PASS
-Correct Azure App Service hostname: PASS
-Production YAML contains no backend.database block: PASS
-Workflow checks for forbidden `filename:` SQLite config: PASS
-Workflow type-checks/builds before Azure deploy: PASS
-Frontend Self-Service component generated: PASS
-Backend Azure Self-Service plugin generated: PASS
+Fixture patch test against user's shown structure: PASS
+Self-Service route inserted: PASS
+Sidebar item inserted: PASS
+Backend plugin registration inserted: PASS
+Build/type-check still occurs before Azure deployment: PASS
+No SQLite filename configuration added: PASS
 
-Full TypeScript compilation must run in GitHub Actions because the user's complete
-Backstage repository/dependency graph is not available in this isolated runtime.
-The workflow deliberately builds before deployment, preserving the currently working
-App Service if the extension does not compile.
+The full Backstage TypeScript compile still runs in GitHub Actions because the complete
+user repository and dependency graph are not present in this isolated environment.
