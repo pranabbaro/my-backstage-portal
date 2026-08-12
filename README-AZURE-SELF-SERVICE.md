@@ -81,3 +81,16 @@ and installs `selfServicePlugin` into the existing `features` array.
 
 The `/self-service` page is registered by the page extension and Backstage's nav
 system can discover it automatically.
+
+
+## V4 correction
+
+GitHub Actions reached TypeScript checking successfully, but your repository has
+`noUnusedLocals` enabled and rejected the unused:
+
+`import React from 'react';`
+
+from `modules/selfService/index.tsx`.
+
+V4 removes that unused import. The file still uses JSX through the project's modern
+JSX transform, so no explicit React import is needed.
