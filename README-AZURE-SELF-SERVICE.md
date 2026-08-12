@@ -57,3 +57,27 @@ It uses your actual file:
 
 The page itself uses standard React HTML controls rather than Material UI form
 components, which reduces version-specific frontend dependency risk.
+
+
+## V3 - exact frontend-system correction
+
+Your `App.tsx` uses the current Backstage frontend system:
+
+```ts
+import { createApp } from '@backstage/frontend-defaults';
+
+export default createApp({
+  features: [catalogPlugin, navModule],
+});
+```
+
+V3 therefore does NOT patch `<FlatRoutes>` and does NOT directly modify Sidebar.tsx.
+
+It creates a local frontend feature using:
+- `createFrontendPlugin`
+- `PageBlueprint`
+
+and installs `selfServicePlugin` into the existing `features` array.
+
+The `/self-service` page is registered by the page extension and Backstage's nav
+system can discover it automatically.

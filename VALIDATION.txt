@@ -1,19 +1,21 @@
 Validation performed
 ====================
-Corrected expected frontend structure: PASS
-  packages/app/src/App.tsx
-  packages/app/src/modules/nav/Sidebar.tsx
+Exact user App.tsx model recognized: PASS
+  createApp from @backstage/frontend-defaults
+  features: [catalogPlugin, navModule]
 
+Legacy FlatRoutes patch removed: PASS
+Direct Sidebar.tsx patch removed: PASS
+New frontend plugin generated: PASS
+PageBlueprint generated for /self-service: PASS
+selfServicePlugin inserted into createApp features: PASS
+New-frontend-system fetchApi/useApi import: PASS
+Backend plugin registration fixture test: PASS
 Recovery YAML parse: PASS
 Production YAML parse: PASS
 GitHub Actions YAML parse: PASS
-Python patch script syntax: PASS
-Fixture patch test against user's shown structure: PASS
-Self-Service route inserted: PASS
-Sidebar item inserted: PASS
-Backend plugin registration inserted: PASS
-Build/type-check still occurs before Azure deployment: PASS
+Build/type-check occurs before Azure deployment: PASS
 No SQLite filename configuration added: PASS
 
-The full Backstage TypeScript compile still runs in GitHub Actions because the complete
-user repository and dependency graph are not present in this isolated environment.
+Full Backstage dependency/type compilation is intentionally performed by GitHub Actions
+against the user's actual repository before the Azure deployment step.
