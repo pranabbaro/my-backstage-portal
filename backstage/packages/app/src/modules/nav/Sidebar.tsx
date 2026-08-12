@@ -18,32 +18,55 @@ export const SidebarContent = NavContentBlueprint.make({
   params: {
     component: ({ navItems }) => {
       const nav = navItems.withComponent(item => (
-        <SidebarItem icon={() => item.icon} to={item.href} text={item.title} />
+        <SidebarItem
+          icon={() => item.icon}
+          to={item.href}
+          text={item.title}
+        />
       ));
 
-      // Skipped items
-      nav.take('page:search'); // Using search modal instead
-      nav.take('page:notifications'); // Using NotificationsSidebarItem manually instead
+      nav.take('page:search');
+      nav.take('page:notifications');
 
       return (
         <Sidebar>
           <SidebarLogo />
-          <SidebarGroup label="Search" icon={<SearchIcon />} to="/search">
+
+          <SidebarGroup
+            label="Search"
+            icon={<SearchIcon />}
+            to="/search"
+          >
             <SidebarSearchModal />
           </SidebarGroup>
+
           <SidebarDivider />
-          <SidebarGroup label="Menu" icon={<MenuIcon />}>
+
+          <SidebarGroup
+            label="Menu"
+            icon={<MenuIcon />}
+          >
             {nav.take('page:catalog')}
+
             {nav.take('page:scaffolder')}
+
+            {nav.take('page:azure-self-service')}
+
             <SidebarDivider />
+
             <SidebarScrollWrapper>
               {nav.rest({ sortBy: 'title' })}
             </SidebarScrollWrapper>
           </SidebarGroup>
+
           <SidebarSpace />
+
           <SidebarDivider />
+
           <NotificationsSidebarItem />
+
           <SidebarDivider />
+
           <SidebarGroup
             label="Settings"
             icon={<UserSettingsSignInAvatar />}
