@@ -1,11 +1,17 @@
-Validation
-V8 preparation script syntax: PASS
+V8 FIX VALIDATION
+=================
+Added missing selfService/types.ts: PASS
+Removed legacy V6 services/appService: PASS
+Removed legacy V6 services/storageAccount: PASS
+Removed legacy V6 services/virtualMachine: PASS
+Removed legacy discovery/network directory: PASS
+Removed legacy discovery/resourceGroups directory: PASS
+Removed old validation.ts importing subscriptionId from config: PASS
+Multi-subscription V8 router preserved: PASS
+Internal/Intranet/DMZ routing preserved: PASS
+Business Managed entitlement logic preserved: PASS
+Existing/New RG selection preserved: PASS
+VNet/Subnet discovery preserved: PASS
+Preparation script performs full Self-Service backend replacement: PASS
 GitHub Actions YAML parse: PASS
-Automatic platform subscription routing code: PASS
-Business Managed entitlement code: PASS
-Existing/New RG code: PASS
-Subscription-scoped VNet/Subnet discovery code: PASS
-Backend subscription enforcement: PASS
-Type-check/build before deployment: PASS
-
-Full TypeScript compilation runs in GitHub Actions against the real Backstage repo.
+Python preparation script syntax: PASS

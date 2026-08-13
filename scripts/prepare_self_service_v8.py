@@ -39,7 +39,16 @@ if item not in s:
 
 # backend modular replacement
 target=backend/'selfService'
-if target.exists(): shutil.rmtree(target)
+
+# V8 is a complete replacement of all previous Self-Service backend modules.
+# This prevents legacy V6/V7 TypeScript files from being compiled.
+if target.exists():
+    shutil.rmtree(target)
+
+legacy_plugin=backend/'selfServicePlugin.ts'
+if legacy_plugin.exists():
+    legacy_plugin.unlink()
+
 shutil.copytree(repo/'overlay/backend/selfService',target)
 shutil.copy2(repo/'overlay/backend/selfServicePlugin.ts',backend/'selfServicePlugin.ts')
 
