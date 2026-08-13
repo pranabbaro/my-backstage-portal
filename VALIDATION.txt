@@ -1,16 +1,18 @@
 Validation performed
 ====================
-Exact TS6133 failure fixed: PASS
-Unused `import React from 'react'` removed: PASS
-New frontend-system PageBlueprint preserved: PASS
-Exact user App.tsx fixture patch: PASS
-selfServicePlugin injected into features array: PASS
-Backend plugin registration fixture: PASS
-Recovery YAML parse: PASS
 Production YAML parse: PASS
+Development YAML parse: PASS
 GitHub Actions YAML parse: PASS
-Type-check remains before Azure deployment: PASS
-No SQLite filename configuration added: PASS
+Single preparation script syntax: PASS
+Exact createApp fixture integration: PASS
+Sidebar Self Service injection fixture: PASS
+Modular backend generation fixture: PASS
+Central Express JSON parser: PASS
+VM route preserved: PASS
+Storage route preserved: PASS
+App Service route preserved: PASS
+Build/type-check occurs before Azure deployment: PASS
+Forbidden SQLite filename config absent: PASS
 
-The full repository TypeScript compile will run in GitHub Actions against the user's
-actual dependency graph before Azure deployment.
+The complete TypeScript compilation is intentionally performed by GitHub Actions
+against the user's actual Backstage repository and dependency graph before deployment.

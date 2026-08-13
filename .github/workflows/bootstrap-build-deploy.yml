@@ -1,4 +1,4 @@
-name: Build and Deploy Backstage Azure Self-Service
+name: Build and Deploy Backstage Self-Service V6
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Apply Azure Self-Service source
+      - name: Apply complete Self-Service V6 source
         run: python3 scripts/prepare_self_service.py
 
       - name: Force safe runtime configuration
@@ -67,7 +67,7 @@ jobs:
           EOF
 
           if grep -R "filename:" backstage/app-config*.yaml; then
-            echo "ERROR: forbidden sqlite filename configuration detected."
+            echo "ERROR: forbidden SQLite filename configuration detected."
             exit 1
           fi
 
@@ -92,8 +92,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           DEPLOY="${{ runner.temp }}/backstage-deploy"
           ZIP="${{ github.workspace }}/backstage-appservice.zip"
+
           rm -rf "$DEPLOY" "$ZIP"
           mkdir -p "$DEPLOY"
 
@@ -105,6 +107,7 @@ jobs:
           tar -xzf backstage/packages/backend/dist/skeleton.tar.gz -C "$DEPLOY"
 
           cd "$DEPLOY"
+
           corepack enable
           yarn workspaces focus --all --production
 
@@ -123,11 +126,16 @@ jobs:
           pkg.scripts = pkg.scripts || {};
           pkg.scripts.start =
             'node packages/backend --config app-config.yaml --config app-config.production.yaml';
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          fs.writeFileSync(
+            'package.json',
+            JSON.stringify(pkg, null, 2) + '\n',
+          );
           NODE
 
+          echo "Checking packaged Backstage configuration..."
+
           if grep -R "filename:" app-config*.yaml; then
-            echo "ERROR: unsafe sqlite filename configuration made it into deployment."
+            echo "ERROR: unsafe SQLite filename configuration reached deployment."
             exit 1
           fi
 
