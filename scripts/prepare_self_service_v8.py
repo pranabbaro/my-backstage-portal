@@ -7,6 +7,45 @@ bs=repo/'backstage'
 app=bs/'packages/app/src'
 backend=bs/'packages/backend/src'
 
+# -----------------------------------------------------------------
+# IMPORTANT V8.1 CLEANUP
+#
+# Windows "Extract and Replace" does not delete files that disappeared
+# from a later ZIP version. Older V6/V7 Self-Service files can therefore
+# remain under overlay/backend/selfService and get copied back into the
+# generated Backstage backend.
+#
+# Remove every known legacy overlay path BEFORE copying V8.
+# -----------------------------------------------------------------
+overlay_self_service=repo/'overlay/backend/selfService'
+
+legacy_overlay_paths=[
+    overlay_self_service/'services',
+    overlay_self_service/'discovery/network',
+    overlay_self_service/'discovery/resourceGroups',
+    overlay_self_service/'validation.ts',
+]
+
+for legacy in legacy_overlay_paths:
+    if legacy.exists():
+        if legacy.is_dir():
+            shutil.rmtree(legacy)
+        else:
+            legacy.unlink()
+
+# Fail fast if any forbidden V6/V7 file somehow remains.
+for forbidden in [
+    overlay_self_service/'services/appService/deploy.ts',
+    overlay_self_service/'services/storageAccount/deploy.ts',
+    overlay_self_service/'services/virtualMachine/deploy.ts',
+    overlay_self_service/'discovery/network/subnets.ts',
+    overlay_self_service/'discovery/network/virtualNetworks.ts',
+    overlay_self_service/'validation.ts',
+]:
+    if forbidden.exists():
+        print(f'ERROR: legacy Self-Service overlay file still exists: {forbidden}')
+        sys.exit(1)
+
 for p in [app/'App.tsx',app/'modules/nav/Sidebar.tsx',backend/'index.ts',bs/'packages/backend/package.json']:
     if not p.exists():
         print(f'Missing {p}');sys.exit(1)
@@ -51,6 +90,19 @@ if legacy_plugin.exists():
 
 shutil.copytree(repo/'overlay/backend/selfService',target)
 shutil.copy2(repo/'overlay/backend/selfServicePlugin.ts',backend/'selfServicePlugin.ts')
+
+# Verify that the generated backend contains ONLY V8 layout.
+for forbidden in [
+    target/'services',
+    target/'discovery/network',
+    target/'discovery/resourceGroups',
+    target/'validation.ts',
+]:
+    if forbidden.exists():
+        print(f'ERROR: legacy generated Self-Service path exists: {forbidden}')
+        sys.exit(1)
+
+print('Legacy V6/V7 Self-Service files removed successfully.')
 
 idx=(backend/'index.ts').read_text()
 impb="import selfServicePlugin from './selfServicePlugin';"

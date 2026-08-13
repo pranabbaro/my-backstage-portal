@@ -26,8 +26,52 @@ jobs:
 
       - run: corepack enable
 
-      - name: Apply V8 Self-Service source
+      - name: Remove stale Self-Service files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf backstage/packages/backend/src/selfService
+          rm -f backstage/packages/backend/src/selfServicePlugin.ts
+
+          rm -rf overlay/backend/selfService/services
+          rm -rf overlay/backend/selfService/discovery/network
+          rm -rf overlay/backend/selfService/discovery/resourceGroups
+          rm -f overlay/backend/selfService/validation.ts
+
+          echo "Remaining V8 overlay files:"
+          find overlay/backend/selfService -maxdepth 3 -type f | sort
+
+      - name: Apply V8.1 Self-Service source
         run: python3 scripts/prepare_self_service_v8.py
+
+      - name: Verify no legacy Self-Service TypeScript remains
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -d backstage/packages/backend/src/selfService/services ]; then
+            echo "ERROR: legacy services directory still exists"
+            find backstage/packages/backend/src/selfService/services -type f
+            exit 1
+          fi
+
+          if [ -d backstage/packages/backend/src/selfService/discovery/network ]; then
+            echo "ERROR: legacy discovery/network directory still exists"
+            exit 1
+          fi
+
+          if [ -f backstage/packages/backend/src/selfService/validation.ts ]; then
+            echo "ERROR: legacy validation.ts still exists"
+            exit 1
+          fi
+
+          if grep -R "subscriptionId.*from.*config" backstage/packages/backend/src/selfService; then
+            echo "ERROR: legacy subscriptionId config import detected"
+            exit 1
+          fi
+
+          echo "V8.1 Self-Service backend layout verified."
 
       - name: Force safe runtime configuration
         shell: bash

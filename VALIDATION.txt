@@ -1,17 +1,31 @@
-V8 FIX VALIDATION
-=================
-Added missing selfService/types.ts: PASS
-Removed legacy V6 services/appService: PASS
-Removed legacy V6 services/storageAccount: PASS
-Removed legacy V6 services/virtualMachine: PASS
-Removed legacy discovery/network directory: PASS
-Removed legacy discovery/resourceGroups directory: PASS
-Removed old validation.ts importing subscriptionId from config: PASS
-Multi-subscription V8 router preserved: PASS
-Internal/Intranet/DMZ routing preserved: PASS
-Business Managed entitlement logic preserved: PASS
-Existing/New RG selection preserved: PASS
-VNet/Subnet discovery preserved: PASS
-Preparation script performs full Self-Service backend replacement: PASS
-GitHub Actions YAML parse: PASS
-Python preparation script syntax: PASS
+V8.1 CLEAN VALIDATION
+=====================
+Root cause fixed: stale overlay files deleted before generation: PASS
+
+Screenshot errors eliminated by design:
+- discovery/network/subnets.ts legacy file: REMOVED
+- discovery/network/virtualNetworks.ts legacy file: REMOVED
+- services/appService/deploy.ts legacy file: REMOVED
+- services/storageAccount/deploy.ts legacy file: REMOVED
+- services/virtualMachine/deploy.ts legacy file: REMOVED
+- validation.ts subscriptionId import: REMOVED
+
+Additional protection:
+- Workflow removes stale overlay files: PASS
+- Workflow removes stale generated backend: PASS
+- Preparation script independently removes stale overlay files: PASS
+- Post-generation legacy-file verification: PASS
+- Legacy subscriptionId-from-config grep guard: PASS
+- GitHub Actions YAML parse: PASS
+- Preparation script Python syntax: PASS
+
+Expected V8 backend files:
+- azureClient.ts
+- config.ts
+- index.ts
+- naming.ts
+- router.ts
+- types.ts
+- routing/subscription.ts
+- discovery/network.ts
+- discovery/resourceGroups.ts
