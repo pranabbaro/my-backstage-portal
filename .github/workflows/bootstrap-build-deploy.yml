@@ -1,4 +1,4 @@
-name: Build and Deploy Backstage Self-Service V6
+name: Build and Deploy Backstage Self-Service V8
 
 on:
   push:
@@ -17,21 +17,17 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Enable Corepack
-        run: corepack enable
+      - run: corepack enable
 
-      - name: Apply complete Self-Service V6 source
-        run: python3 scripts/prepare_self_service.py
+      - name: Apply V8 Self-Service source
+        run: python3 scripts/prepare_self_service_v8.py
 
       - name: Force safe runtime configuration
         shell: bash
@@ -45,10 +41,8 @@ jobs:
               - page:catalog:
                   config:
                     path: /
-
           organization:
             name: Enterprise Platform
-
           backend:
             baseUrl: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
             listen:
@@ -58,87 +52,55 @@ jobs:
               origin: https://backstage-pranab-mvp-e9gcgmasd5abgth5.centralindia-01.azurewebsites.net
               methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
               credentials: true
-
           auth:
             environment: production
             providers:
               guest:
                 dangerouslyAllowOutsideDevelopment: true
           EOF
-
-          if grep -R "filename:" backstage/app-config*.yaml; then
-            echo "ERROR: forbidden SQLite filename configuration detected."
-            exit 1
-          fi
+          if grep -R "filename:" backstage/app-config*.yaml; then exit 1; fi
 
       - name: Install dependencies
         working-directory: backstage
-        run: |
-          set -euo pipefail
-          corepack enable
-          yarn install --no-immutable
+        run: yarn install --no-immutable
 
       - name: Type check
         working-directory: backstage
         run: yarn tsc
 
-      - name: Build production backend and frontend
+      - name: Build
         working-directory: backstage
         env:
           NODE_ENV: production
         run: yarn build:backend
 
-      - name: Prepare App Service runtime package
+      - name: Package
         shell: bash
         run: |
           set -euo pipefail
-
           DEPLOY="${{ runner.temp }}/backstage-deploy"
           ZIP="${{ github.workspace }}/backstage-appservice.zip"
-
           rm -rf "$DEPLOY" "$ZIP"
           mkdir -p "$DEPLOY"
-
           cp backstage/package.json backstage/yarn.lock "$DEPLOY/"
           [ -f backstage/.yarnrc.yml ] && cp backstage/.yarnrc.yml "$DEPLOY/" || true
           [ -f backstage/backstage.json ] && cp backstage/backstage.json "$DEPLOY/" || true
           [ -d backstage/.yarn ] && cp -R backstage/.yarn "$DEPLOY/.yarn" || true
-
           tar -xzf backstage/packages/backend/dist/skeleton.tar.gz -C "$DEPLOY"
-
           cd "$DEPLOY"
-
           corepack enable
           yarn workspaces focus --all --production
-
           tar -xzf "${{ github.workspace }}/backstage/packages/backend/dist/bundle.tar.gz" -C "$DEPLOY"
-
           cp "${{ github.workspace }}/backstage/app-config.yaml" "$DEPLOY/app-config.yaml"
           cp "${{ github.workspace }}/backstage/app-config.production.yaml" "$DEPLOY/app-config.production.yaml"
-
-          if [ -d "${{ github.workspace }}/backstage/examples" ]; then
-            cp -R "${{ github.workspace }}/backstage/examples" "$DEPLOY/examples"
-          fi
-
+          [ -d "${{ github.workspace }}/backstage/examples" ] && cp -R "${{ github.workspace }}/backstage/examples" "$DEPLOY/examples" || true
           node <<'NODE'
-          const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.scripts = pkg.scripts || {};
-          pkg.scripts.start =
-            'node packages/backend --config app-config.yaml --config app-config.production.yaml';
-          fs.writeFileSync(
-            'package.json',
-            JSON.stringify(pkg, null, 2) + '\n',
-          );
+          const fs=require('fs');
+          const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+          pkg.scripts=pkg.scripts||{};
+          pkg.scripts.start='node packages/backend --config app-config.yaml --config app-config.production.yaml';
+          fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
           NODE
-
-          echo "Checking packaged Backstage configuration..."
-
-          if grep -R "filename:" app-config*.yaml; then
-            echo "ERROR: unsafe SQLite filename configuration reached deployment."
-            exit 1
-          fi
-
           zip -qr "$ZIP" .
 
       - name: Deploy to Azure App Service

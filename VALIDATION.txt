@@ -1,18 +1,11 @@
-Validation performed
-====================
-V7 overlay generation fixture: PASS
-Dynamic VNet discovery module: PASS
-Dynamic Subnet discovery module: PASS
-Central naming engine: PASS
-Backend-enforced VM naming: PASS
-Frontend VNet dropdown: PASS
-Frontend Subnet dropdown: PASS
-Subnet Resource ID kept internal: PASS
-Generated naming preview: PASS
-Existing VM deployment flow preserved: PASS
-Development YAML parse: PASS
-Production YAML parse: PASS
+Validation
+V8 preparation script syntax: PASS
 GitHub Actions YAML parse: PASS
-Type-check/build remain before Azure deployment: PASS
+Automatic platform subscription routing code: PASS
+Business Managed entitlement code: PASS
+Existing/New RG code: PASS
+Subscription-scoped VNet/Subnet discovery code: PASS
+Backend subscription enforcement: PASS
+Type-check/build before deployment: PASS
 
-Complete TypeScript compilation will run in GitHub Actions against the actual Backstage dependency graph before deployment.
+Full TypeScript compilation runs in GitHub Actions against the real Backstage repo.

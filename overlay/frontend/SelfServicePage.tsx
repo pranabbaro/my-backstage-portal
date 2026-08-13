@@ -1,685 +1,178 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Content,
-  Header,
-  InfoCard,
-  Page,
-  Progress,
-} from '@backstage/core-components';
-import {
-  fetchApiRef,
-  useApi,
-} from '@backstage/frontend-plugin-api';
 
-type ServiceType = 'vm' | 'storage' | 'app-service';
+import { useEffect, useState } from 'react';
+import { Content, Header, InfoCard, Page, Progress } from '@backstage/core-components';
+import { fetchApiRef, useApi } from '@backstage/frontend-plugin-api';
 
-type PlatformConfig = {
-  managedIdentity?: boolean;
-  subscriptionConfigured?: boolean;
-  subscriptionId?: string;
-  allowedLocations?: string[];
-  error?: string;
-};
+type NetworkType='internal'|'intranet'|'dmz'|'business-managed';
+type Subscription={subscriptionId:string;displayName:string};
+type RG={id:string;name:string;location:string};
+type VNet={id:string;name:string;resourceGroup:string;addressPrefixes:string[]};
+type Subnet={id:string;name:string;addressPrefixes:string[]};
+type Names={resourceGroup:string;virtualMachine:string;networkInterface:string};
 
-type VnetOption = {
-  id: string;
-  name: string;
-  location: string;
-  resourceGroup: string;
-  addressPrefixes: string[];
-};
+const input:React.CSSProperties={width:'100%',boxSizing:'border-box',padding:'10px 12px',border:'1px solid #c8c8c8',background:'#fff'};
+const label:React.CSSProperties={display:'block',fontWeight:600,marginBottom:6};
+const grid:React.CSSProperties={display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:18};
 
-type SubnetOption = {
-  id: string;
-  name: string;
-  addressPrefixes: string[];
-};
+export const SelfServicePage=()=>{
+  const fetchApi=useApi(fetchApiRef);
+  const [cfg,setCfg]=useState<any>(null);
+  const [busy,setBusy]=useState(false);
+  const [status,setStatus]=useState<Record<string,unknown>|null>(null);
+  const [subs,setSubs]=useState<Subscription[]>([]);
+  const [autoSub,setAutoSub]=useState<Subscription|null>(null);
+  const [rgs,setRgs]=useState<RG[]>([]);
+  const [vnets,setVnets]=useState<VNet[]>([]);
+  const [subnets,setSubnets]=useState<Subnet[]>([]);
+  const [names,setNames]=useState<Names|null>(null);
+  const [error,setError]=useState('');
 
-type NamingPreview = {
-  workload: string;
-  environment: string;
-  environmentCode: string;
-  location: string;
-  regionCode: string;
-  instance: string;
-  resourceGroup: string;
-  virtualMachine: string;
-  networkInterface: string;
-  storageAccount: string;
-  appService: string;
-  appServicePlan: string;
-};
-
-const fallbackLocations = ['centralindia', 'southindia', 'westindia'];
-
-const inputStyle = {
-  width: '100%',
-  boxSizing: 'border-box' as const,
-  padding: '10px 12px',
-  border: '1px solid #c8c8c8',
-  borderRadius: 2,
-  fontSize: 14,
-  background: '#ffffff',
-};
-
-const labelStyle = {
-  display: 'block',
-  fontWeight: 600,
-  marginBottom: 6,
-  fontSize: 14,
-};
-
-const helperStyle = {
-  marginTop: 5,
-  fontSize: 12,
-  color: '#555555',
-};
-
-const services: Array<{
-  id: ServiceType;
-  title: string;
-  category: string;
-  description: string;
-  icon: string;
-}> = [
-  {
-    id: 'vm',
-    title: 'Virtual Machine',
-    category: 'Compute',
-    description:
-      'Create a secure Azure Linux virtual machine using an approved enterprise configuration.',
-    icon: 'VM',
-  },
-  {
-    id: 'storage',
-    title: 'Storage Account',
-    category: 'Storage',
-    description:
-      'Create an Azure Storage Account with approved replication and security defaults.',
-    icon: 'ST',
-  },
-  {
-    id: 'app-service',
-    title: 'App Service',
-    category: 'Web',
-    description:
-      'Deploy an Azure Linux App Service on an approved managed application plan.',
-    icon: 'AP',
-  },
-];
-
-export const SelfServicePage = () => {
-  const fetchApi = useApi(fetchApiRef);
-  const [service, setService] = useState<ServiceType | null>('vm');
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<Record<string, unknown> | null>(null);
-  const [config, setConfig] = useState<PlatformConfig | null>(null);
-  const [search, setSearch] = useState('');
-
-  const [vm, setVm] = useState({
-    workload: 'backstage',
-    environment: 'development',
-    instance: '01',
-    location: 'centralindia',
-    vmSize: 'Standard_B2s',
-    adminUsername: 'azureadmin',
-    vnetId: '',
-    subnetResourceId: '',
-    sshPublicKey: '',
+  const [f,setF]=useState({
+    workload:'backstage',environment:'development',location:'centralindia',instance:'01',
+    networkType:'internal' as NetworkType,subscriptionId:'',
+    resourceGroupMode:'new' as 'existing'|'new',resourceGroup:'',
+    vnetId:'',subnetResourceId:'',vmSize:'Standard_B2s',
+    adminUsername:'azureadmin',sshPublicKey:'',
   });
 
-  const [naming, setNaming] = useState<NamingPreview | null>(null);
-  const [vnets, setVnets] = useState<VnetOption[]>([]);
-  const [subnets, setSubnets] = useState<SubnetOption[]>([]);
-  const [networkLoading, setNetworkLoading] = useState(false);
-  const [networkError, setNetworkError] = useState('');
+  useEffect(()=>{fetchApi.fetch('/api/azure-self-service/config').then(r=>r.json()).then(setCfg)},[fetchApi]);
 
-  const [storage, setStorage] = useState({
-    resourceGroup: 'rg-selfservice-test',
-    location: 'centralindia',
-    name: '',
-    sku: 'Standard_LRS',
-  });
+  useEffect(()=>{
+    const q=new URLSearchParams({workload:f.workload,environment:f.environment,location:f.location,instance:f.instance});
+    fetchApi.fetch(`/api/azure-self-service/naming/preview?${q}`).then(async r=>{
+      if(!r.ok) throw new Error();
+      setNames(await r.json());
+    }).catch(()=>setNames(null));
+  },[fetchApi,f.workload,f.environment,f.location,f.instance]);
 
-  const [appService, setAppService] = useState({
-    resourceGroup: 'rg-selfservice-test',
-    location: 'centralindia',
-    name: '',
-    planName: '',
-    sku: 'B1',
-  });
-
-  useEffect(() => {
-    fetchApi
-      .fetch('/api/azure-self-service/config')
-      .then(async response => {
-        const body = (await response.json()) as PlatformConfig;
-        setConfig(body);
-      })
-      .catch(error => setConfig({ error: String(error) }));
-  }, [fetchApi]);
-
-  const platformReady = Boolean(
-    config?.managedIdentity && config?.subscriptionConfigured,
-  );
-  const locations = config?.allowedLocations || fallbackLocations;
-
-  useEffect(() => {
-    if (!platformReady) return;
-    const query = new URLSearchParams({
-      workload: vm.workload,
-      environment: vm.environment,
-      location: vm.location,
-      instance: vm.instance,
-    }).toString();
-
-    fetchApi
-      .fetch(`/api/azure-self-service/naming/preview?${query}`)
-      .then(async response => {
-        const body = (await response.json()) as NamingPreview | { error?: string };
-        if (!response.ok) {
-          throw new Error(
-            'error' in body ? String(body.error) : 'Naming preview failed',
-          );
-        }
-        setNaming(body as NamingPreview);
-      })
-      .catch(() => setNaming(null));
-  }, [
-    fetchApi,
-    platformReady,
-    vm.workload,
-    vm.environment,
-    vm.location,
-    vm.instance,
-  ]);
-
-  useEffect(() => {
-    if (!platformReady) return;
-
-    setNetworkLoading(true);
-    setNetworkError('');
-    setVnets([]);
-    setSubnets([]);
-    setVm(current => ({
-      ...current,
-      vnetId: '',
-      subnetResourceId: '',
-    }));
-
-    fetchApi
-      .fetch(
-        `/api/azure-self-service/network/vnets?location=${encodeURIComponent(
-          vm.location,
-        )}`,
-      )
-      .then(async response => {
-        const body = (await response.json()) as {
-          value?: VnetOption[];
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(body.error || 'Unable to load VNets');
-        }
-        setVnets(body.value || []);
-      })
-      .catch(error => setNetworkError(String(error)))
-      .finally(() => setNetworkLoading(false));
-  }, [fetchApi, platformReady, vm.location]);
-
-  useEffect(() => {
-    if (!vm.vnetId) {
-      setSubnets([]);
-      return;
+  useEffect(()=>{
+    if(!cfg?.managedIdentity) return;
+    setError(''); setAutoSub(null); setSubs([]);
+    setF(x=>({...x,subscriptionId:'',resourceGroup:'',vnetId:'',subnetResourceId:''}));
+    if(f.networkType==='business-managed'){
+      fetchApi.fetch('/api/azure-self-service/subscriptions/business-managed').then(async r=>{
+        const b=await r.json(); if(!r.ok) throw new Error(b.error||'Unable to load assigned subscriptions');
+        setSubs(b.value||[]);
+      }).catch(e=>setError(String(e)));
+    } else {
+      const q=new URLSearchParams({networkType:f.networkType,location:f.location});
+      fetchApi.fetch(`/api/azure-self-service/subscriptions/resolve?${q}`).then(async r=>{
+        const b=await r.json(); if(!r.ok) throw new Error(b.error||'Unable to resolve subscription');
+        setAutoSub(b.subscription);
+        setF(x=>({...x,subscriptionId:b.subscription.subscriptionId}));
+      }).catch(e=>setError(String(e)));
     }
+  },[fetchApi,cfg?.managedIdentity,f.networkType,f.location]);
 
-    setNetworkLoading(true);
-    setNetworkError('');
-    setSubnets([]);
-    setVm(current => ({ ...current, subnetResourceId: '' }));
+  const activeSub=f.networkType==='business-managed'?f.subscriptionId:autoSub?.subscriptionId||'';
 
-    fetchApi
-      .fetch(
-        `/api/azure-self-service/network/subnets?vnetId=${encodeURIComponent(
-          vm.vnetId,
-        )}`,
-      )
-      .then(async response => {
-        const body = (await response.json()) as {
-          value?: SubnetOption[];
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(body.error || 'Unable to load subnets');
-        }
-        setSubnets(body.value || []);
-      })
-      .catch(error => setNetworkError(String(error)))
-      .finally(() => setNetworkLoading(false));
-  }, [fetchApi, vm.vnetId]);
+  useEffect(()=>{
+    if(!activeSub) return;
+    setRgs([]); setVnets([]); setSubnets([]);
+    setF(x=>({...x,resourceGroup:'',vnetId:'',subnetResourceId:''}));
+    const rq=new URLSearchParams({subscriptionId:activeSub,location:f.location});
+    fetchApi.fetch(`/api/azure-self-service/resource-groups?${rq}`).then(r=>r.json()).then(b=>setRgs(b.value||[]));
+    fetchApi.fetch(`/api/azure-self-service/network/vnets?${rq}`).then(r=>r.json()).then(b=>setVnets(b.value||[]));
+  },[fetchApi,activeSub,f.location]);
 
-  const visibleServices = useMemo(
-    () =>
-      services.filter(item =>
-        `${item.title} ${item.category} ${item.description}`
-          .toLowerCase()
-          .includes(search.trim().toLowerCase()),
-      ),
-    [search],
-  );
+  useEffect(()=>{
+    if(!f.vnetId){setSubnets([]);return;}
+    setF(x=>({...x,subnetResourceId:''}));
+    fetchApi.fetch(`/api/azure-self-service/network/subnets?vnetId=${encodeURIComponent(f.vnetId)}`)
+      .then(r=>r.json()).then(b=>setSubnets(b.value||[]));
+  },[fetchApi,f.vnetId]);
 
-  const selectedService = services.find(item => item.id === service);
+  const ready=Boolean(activeSub&&f.subnetResourceId&&f.sshPublicKey.trim()&&names&&(f.resourceGroupMode==='new'||f.resourceGroup));
 
-  const submit = async () => {
-    if (!service) return;
-    setBusy(true);
-    setStatus(null);
-
-    try {
-      let payload: Record<string, string> = {};
-
-      if (service === 'vm') {
-        payload = {
-          workload: vm.workload,
-          environment: vm.environment,
-          instance: vm.instance,
-          location: vm.location,
-          vmSize: vm.vmSize,
-          adminUsername: vm.adminUsername,
-          subnetResourceId: vm.subnetResourceId,
-          sshPublicKey: vm.sshPublicKey,
-        };
-      } else if (service === 'storage') {
-        payload = { ...storage };
-      } else {
-        payload = { ...appService };
-      }
-
-      const response = await fetchApi.fetch(
-        `/api/azure-self-service/deploy/${service}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        },
-      );
-
-      const result = (await response.json()) as Record<string, unknown>;
-      setStatus(result);
-    } catch (error) {
-      setStatus({ error: String(error) });
-    } finally {
-      setBusy(false);
-    }
+  const deploy=async()=>{
+    setBusy(true);setStatus(null);
+    try{
+      const r=await fetchApi.fetch('/api/azure-self-service/deploy/vm',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({...f,subscriptionId:activeSub}),
+      });
+      setStatus(await r.json());
+    }catch(e){setStatus({error:String(e)});}
+    finally{setBusy(false);}
   };
 
-  const vmReady = Boolean(naming) && Boolean(vm.subnetResourceId) && Boolean(vm.sshPublicKey.trim());
+  return <Page themeId="tool">
+    <Header title="Self-Service Market" subtitle="Approved cloud placement and deployment"/>
+    <Content>
+      <InfoCard title="Platform readiness">
+        {!cfg?<Progress/>:<div>
+          Managed Identity: <b>{cfg.managedIdentity?'Ready':'Not configured'}</b>
+          {' | '}Subscription routing: <b>{cfg.subscriptionRoutingConfigured?'Ready':'Not configured'}</b>
+        </div>}
+      </InfoCard>
 
-  return (
-    <Page themeId="tool">
-      <Header
-        title="Self-Service Market"
-        subtitle="Discover and deploy approved cloud services"
-      />
-      <Content>
-        <div style={{ fontSize: 13, marginBottom: 20 }}>
-          Home &nbsp;&gt;&nbsp; Self Service &nbsp;&gt;&nbsp; Marketplace
-        </div>
+      <div style={{height:20}}/>
+      <h2>Create Virtual Machine</h2>
 
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 600 }}>Marketplace</h1>
-          <div style={{ marginTop: 8, fontSize: 15 }}>
-            Select an approved Azure service and configure your deployment.
-          </div>
-        </div>
+      <div style={grid}>
+        <div><label style={label}>Application / Workload</label><input style={input} value={f.workload} onChange={e=>setF({...f,workload:e.target.value})}/></div>
+        <div><label style={label}>Environment</label><select style={input} value={f.environment} onChange={e=>setF({...f,environment:e.target.value})}>
+          <option value="development">Development</option><option value="test">Test</option><option value="staging">Staging</option><option value="production">Production</option>
+        </select></div>
+        <div><label style={label}>Region</label><select style={input} value={f.location} onChange={e=>setF({...f,location:e.target.value})}>
+          {(cfg?.allowedLocations||['centralindia','southindia','westindia']).map((x:string)=><option key={x}>{x}</option>)}
+        </select></div>
+        <div><label style={label}>Instance</label><input style={input} value={f.instance} onChange={e=>setF({...f,instance:e.target.value})}/></div>
+      </div>
 
-        <div style={{ maxWidth: 760, marginBottom: 24 }}>
-          <input
-            style={{ ...inputStyle, height: 46, fontSize: 15 }}
-            placeholder="Search Azure services"
-            value={search}
-            onChange={event => setSearch(event.target.value)}
-          />
-        </div>
+      <h3>Network Connection Type</h3>
+      <select style={input} value={f.networkType} onChange={e=>setF({...f,networkType:e.target.value as NetworkType})}>
+        <option value="internal">Internal</option><option value="intranet">Intranet</option><option value="dmz">DMZ</option><option value="business-managed">Business Managed</option>
+      </select>
 
-        <InfoCard title="Platform readiness">
-          {!config ? (
-            <Progress />
-          ) : config.error ? (
-            <div>{config.error}</div>
-          ) : (
-            <div>
-              Managed Identity: <strong>{config.managedIdentity ? 'Ready' : 'Not configured'}</strong>
-              {' | '}Azure Subscription: <strong>{config.subscriptionConfigured ? 'Ready' : 'Not configured'}</strong>
-              {' | '}Allowed regions: <strong>{locations.join(', ')}</strong>
-            </div>
-          )}
-        </InfoCard>
+      <h3>Target Subscription</h3>
+      {f.networkType==='business-managed'
+        ? <select style={input} value={f.subscriptionId} onChange={e=>setF({...f,subscriptionId:e.target.value})}>
+            <option value="">Select an assigned subscription</option>
+            {subs.map(s=><option key={s.subscriptionId} value={s.subscriptionId}>{s.displayName}</option>)}
+          </select>
+        : <div style={{padding:12,background:'#f6f8fa'}}><b>{autoSub?.displayName||'Resolving...'}</b><div>Automatically selected by placement policy.</div></div>}
+      {error&&<div style={{marginTop:8}}>{error}</div>}
 
-        <div style={{ height: 28 }} />
-        <h2 style={{ fontSize: 22, marginBottom: 16 }}>Azure services</h2>
+      <h3>Resource Group</h3>
+      <label><input type="radio" checked={f.resourceGroupMode==='existing'} onChange={()=>setF({...f,resourceGroupMode:'existing'})}/> Use existing</label>{' '}
+      <label><input type="radio" checked={f.resourceGroupMode==='new'} onChange={()=>setF({...f,resourceGroupMode:'new',resourceGroup:''})}/> Create new</label>
+      {f.resourceGroupMode==='existing'
+        ? <select style={{...input,marginTop:10}} value={f.resourceGroup} onChange={e=>setF({...f,resourceGroup:e.target.value})}>
+            <option value="">Select an existing Resource Group</option>{rgs.map(r=><option key={r.id} value={r.name}>{r.name}</option>)}
+          </select>
+        : <div style={{padding:12,background:'#f6f8fa',marginTop:10}}><b>{names?.resourceGroup||'Generating...'}</b></div>}
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {visibleServices.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setService(item.id);
-                setStatus(null);
-              }}
-              style={{
-                textAlign: 'left',
-                background: '#ffffff',
-                border: service === item.id ? '2px solid #0078d4' : '1px solid #d7d7d7',
-                borderRadius: 2,
-                padding: 20,
-                cursor: 'pointer',
-                minHeight: 170,
-              }}
-            >
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#0078d4',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  marginBottom: 14,
-                }}
-              >
-                {item.icon}
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 600 }}>{item.title}</div>
-              <div style={{ marginTop: 5, fontSize: 13 }}>{item.category}</div>
-              <div style={{ marginTop: 12, fontSize: 14, lineHeight: 1.5 }}>
-                {item.description}
-              </div>
-            </button>
-          ))}
-        </div>
+      <h3>Network</h3>
+      <div style={grid}>
+        <div><label style={label}>Virtual Network</label><select style={input} value={f.vnetId} onChange={e=>setF({...f,vnetId:e.target.value})}>
+          <option value="">Select a VNet</option>{vnets.map(v=><option key={v.id} value={v.id}>{v.name} — {v.resourceGroup}</option>)}
+        </select></div>
+        <div><label style={label}>Subnet</label><select style={input} value={f.subnetResourceId} disabled={!f.vnetId} onChange={e=>setF({...f,subnetResourceId:e.target.value})}>
+          <option value="">Select a subnet</option>{subnets.map(s=><option key={s.id} value={s.id}>{s.name}{s.addressPrefixes.length?` — ${s.addressPrefixes.join(', ')}`:''}</option>)}
+        </select></div>
+      </div>
 
-        {selectedService && (
-          <>
-            <div style={{ height: 34 }} />
-            <div style={{ background: '#ffffff', border: '1px solid #d7d7d7' }}>
-              <div style={{ padding: '18px 22px', borderBottom: '1px solid #d7d7d7' }}>
-                <h2 style={{ margin: 0, fontSize: 22 }}>Create {selectedService.title}</h2>
-                <div style={{ marginTop: 6, fontSize: 14 }}>
-                  Configure approved deployment settings.
-                </div>
-              </div>
+      <h3>Generated Names</h3>
+      <div style={{padding:12,background:'#f6f8fa'}}>
+        VM: <b>{names?.virtualMachine||'Generating...'}</b><br/>NIC: <b>{names?.networkInterface||'Generating...'}</b>
+      </div>
 
-              {service === 'vm' && (
-                <div style={{ padding: 24 }}>
-                  <h3>Deployment intent</h3>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                      gap: 20,
-                    }}
-                  >
-                    <div>
-                      <label style={labelStyle}>Application / Workload</label>
-                      <input
-                        style={inputStyle}
-                        value={vm.workload}
-                        onChange={event => setVm({ ...vm, workload: event.target.value })}
-                      />
-                      <div style={helperStyle}>Used by the naming engine.</div>
-                    </div>
+      <h3>Compute</h3>
+      <div style={grid}>
+        <div><label style={label}>VM Size</label><select style={input} value={f.vmSize} onChange={e=>setF({...f,vmSize:e.target.value})}>
+          <option>Standard_B2s</option><option>Standard_D2s_v5</option><option>Standard_D4s_v5</option>
+        </select></div>
+        <div><label style={label}>Administrator Username</label><input style={input} value={f.adminUsername} onChange={e=>setF({...f,adminUsername:e.target.value})}/></div>
+      </div>
 
-                    <div>
-                      <label style={labelStyle}>Environment</label>
-                      <select
-                        style={inputStyle}
-                        value={vm.environment}
-                        onChange={event => setVm({ ...vm, environment: event.target.value })}
-                      >
-                        <option value="development">Development</option>
-                        <option value="test">Test</option>
-                        <option value="staging">Staging</option>
-                        <option value="production">Production</option>
-                      </select>
-                    </div>
+      <div style={{marginTop:18}}><label style={label}>SSH Public Key</label><textarea style={{...input,minHeight:90}} value={f.sshPublicKey} onChange={e=>setF({...f,sshPublicKey:e.target.value})}/></div>
 
-                    <div>
-                      <label style={labelStyle}>Region</label>
-                      <select
-                        style={inputStyle}
-                        value={vm.location}
-                        onChange={event => setVm({ ...vm, location: event.target.value })}
-                      >
-                        {locations.map(location => (
-                          <option key={location} value={location}>{location}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Instance</label>
-                      <input
-                        style={inputStyle}
-                        value={vm.instance}
-                        onChange={event => setVm({ ...vm, instance: event.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ height: 28 }} />
-                  <h3>Generated naming</h3>
-                  <div
-                    style={{
-                      background: '#f6f8fa',
-                      border: '1px solid #d7d7d7',
-                      padding: 18,
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                      gap: 16,
-                    }}
-                  >
-                    <div><strong>Resource Group</strong><div>{naming?.resourceGroup || 'Generating...'}</div></div>
-                    <div><strong>VM Name</strong><div>{naming?.virtualMachine || 'Generating...'}</div></div>
-                    <div><strong>NIC Name</strong><div>{naming?.networkInterface || 'Generating...'}</div></div>
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 13 }}>
-                    {naming ? '✓ Naming compliant' : 'Waiting for valid naming inputs'}
-                  </div>
-
-                  <div style={{ height: 28 }} />
-                  <h3>Networking</h3>
-                  {networkLoading && <Progress />}
-                  {networkError && <div style={{ marginBottom: 16 }}>{networkError}</div>}
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                      gap: 20,
-                    }}
-                  >
-                    <div>
-                      <label style={labelStyle}>Virtual Network</label>
-                      <select
-                        style={inputStyle}
-                        value={vm.vnetId}
-                        onChange={event => setVm({ ...vm, vnetId: event.target.value })}
-                      >
-                        <option value="">Select a VNet</option>
-                        {vnets.map(vnet => (
-                          <option key={vnet.id} value={vnet.id}>
-                            {vnet.name} — {vnet.resourceGroup}
-                            {vnet.addressPrefixes.length ? ` — ${vnet.addressPrefixes.join(', ')}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <div style={helperStyle}>VNets are discovered from Azure in the selected region.</div>
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Subnet</label>
-                      <select
-                        style={inputStyle}
-                        disabled={!vm.vnetId}
-                        value={vm.subnetResourceId}
-                        onChange={event => setVm({ ...vm, subnetResourceId: event.target.value })}
-                      >
-                        <option value="">Select a subnet</option>
-                        {subnets.map(subnet => (
-                          <option key={subnet.id} value={subnet.id}>
-                            {subnet.name}
-                            {subnet.addressPrefixes.length ? ` — ${subnet.addressPrefixes.join(', ')}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <div style={helperStyle}>The subnet Resource ID is retained internally.</div>
-                    </div>
-                  </div>
-
-                  <div style={{ height: 28 }} />
-                  <h3>Compute</h3>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                      gap: 20,
-                    }}
-                  >
-                    <div>
-                      <label style={labelStyle}>VM Size</label>
-                      <select
-                        style={inputStyle}
-                        value={vm.vmSize}
-                        onChange={event => setVm({ ...vm, vmSize: event.target.value })}
-                      >
-                        <option value="Standard_B2s">Standard_B2s</option>
-                        <option value="Standard_D2s_v5">Standard_D2s_v5</option>
-                        <option value="Standard_D4s_v5">Standard_D4s_v5</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Administrator Username</label>
-                      <input
-                        style={inputStyle}
-                        value={vm.adminUsername}
-                        onChange={event => setVm({ ...vm, adminUsername: event.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 20 }}>
-                    <label style={labelStyle}>SSH Public Key</label>
-                    <textarea
-                      style={{ ...inputStyle, minHeight: 90 }}
-                      value={vm.sshPublicKey}
-                      onChange={event => setVm({ ...vm, sshPublicKey: event.target.value })}
-                    />
-                  </div>
-
-                  <div style={{ marginTop: 30, borderTop: '1px solid #d7d7d7', paddingTop: 20 }}>
-                    <button
-                      type="button"
-                      disabled={busy || !platformReady || !vmReady}
-                      onClick={submit}
-                      style={{
-                        padding: '10px 22px',
-                        border: 0,
-                        background: platformReady && vmReady ? '#0078d4' : '#bcbcbc',
-                        color: '#ffffff',
-                        fontWeight: 600,
-                        cursor: platformReady && vmReady ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      {busy ? 'Deploying...' : 'Deploy Virtual Machine'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {service === 'storage' && (
-                <div style={{ padding: 24 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
-                    <div>
-                      <label style={labelStyle}>Resource Group</label>
-                      <input style={inputStyle} value={storage.resourceGroup} onChange={event => setStorage({ ...storage, resourceGroup: event.target.value })} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Region</label>
-                      <select style={inputStyle} value={storage.location} onChange={event => setStorage({ ...storage, location: event.target.value })}>
-                        {locations.map(location => <option key={location} value={location}>{location}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Storage Account Name</label>
-                      <input style={inputStyle} value={storage.name} onChange={event => setStorage({ ...storage, name: event.target.value })} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Replication</label>
-                      <select style={inputStyle} value={storage.sku} onChange={event => setStorage({ ...storage, sku: event.target.value })}>
-                        <option value="Standard_LRS">Standard LRS</option>
-                        <option value="Standard_ZRS">Standard ZRS</option>
-                        <option value="Standard_GRS">Standard GRS</option>
-                      </select>
-                    </div>
-                  </div>
-                  <button type="button" disabled={busy || !platformReady || !storage.name} onClick={submit} style={{ marginTop: 24, padding: '10px 22px' }}>
-                    Deploy Storage Account
-                  </button>
-                </div>
-              )}
-
-              {service === 'app-service' && (
-                <div style={{ padding: 24 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
-                    <div>
-                      <label style={labelStyle}>Resource Group</label>
-                      <input style={inputStyle} value={appService.resourceGroup} onChange={event => setAppService({ ...appService, resourceGroup: event.target.value })} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Region</label>
-                      <select style={inputStyle} value={appService.location} onChange={event => setAppService({ ...appService, location: event.target.value })}>
-                        {locations.map(location => <option key={location} value={location}>{location}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>App Service Name</label>
-                      <input style={inputStyle} value={appService.name} onChange={event => setAppService({ ...appService, name: event.target.value })} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>App Service Plan</label>
-                      <input style={inputStyle} value={appService.planName} onChange={event => setAppService({ ...appService, planName: event.target.value })} />
-                    </div>
-                  </div>
-                  <button type="button" disabled={busy || !platformReady || !appService.name} onClick={submit} style={{ marginTop: 24, padding: '10px 22px' }}>
-                    Deploy App Service
-                  </button>
-                </div>
-              )}
-
-              {busy && <div style={{ padding: '0 24px 20px' }}><Progress /></div>}
-
-              {status && (
-                <div style={{ padding: '0 24px 24px' }}>
-                  <h3>Deployment Result</h3>
-                  <pre style={{ padding: 16, background: '#f5f5f5', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                    {JSON.stringify(status, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </Content>
-    </Page>
-  );
+      <button type="button" disabled={busy||!ready} onClick={deploy} style={{marginTop:22,padding:'10px 22px'}}>
+        {busy?'Deploying...':'Deploy Virtual Machine'}
+      </button>
+      {busy&&<Progress/>}
+      {status&&<pre style={{marginTop:18,padding:14,background:'#f5f5f5',whiteSpace:'pre-wrap'}}>{JSON.stringify(status,null,2)}</pre>}
+    </Content>
+  </Page>;
 };
