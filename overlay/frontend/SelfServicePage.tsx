@@ -78,7 +78,7 @@ export const SelfServicePage = () => {
 
   const [service, setService] = useState<ServiceType | null>(null);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<unknown>(null);
+  const [status, setStatus] = useState<Record<string, unknown> | null>(null);
   const [config, setConfig] = useState<PlatformConfig | null>(null);
   const [search, setSearch] = useState('');
 
@@ -161,7 +161,7 @@ export const SelfServicePage = () => {
         },
       );
 
-      const result = await response.json();
+      const result = (await response.json()) as Record<string, unknown>;
       setStatus(result);
     } catch (error) {
       setStatus({
