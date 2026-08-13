@@ -104,6 +104,27 @@ for forbidden in [
 
 print('Legacy V6/V7 Self-Service files removed successfully.')
 
+# Validate V8 shared type contract before GitHub reaches yarn tsc.
+generated_types=target/'types.ts'
+generated_client=target/'azureClient.ts'
+
+if not generated_types.exists():
+    print('ERROR: generated selfService/types.ts is missing')
+    sys.exit(1)
+
+types_text=generated_types.read_text(encoding='utf-8')
+client_text=generated_client.read_text(encoding='utf-8')
+
+if 'JsonRecord' in client_text and 'export type JsonRecord' not in types_text:
+    print('ERROR: azureClient.ts imports JsonRecord but types.ts does not export it')
+    sys.exit(1)
+
+if 'SelfServiceLogger' not in types_text:
+    print('ERROR: types.ts does not export SelfServiceLogger')
+    sys.exit(1)
+
+print('V8.2 shared Self-Service type contract verified.')
+
 idx=(backend/'index.ts').read_text()
 impb="import selfServicePlugin from './selfServicePlugin';"
 if impb not in idx:

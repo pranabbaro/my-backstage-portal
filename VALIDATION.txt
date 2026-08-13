@@ -1,31 +1,21 @@
-V8.1 CLEAN VALIDATION
-=====================
-Root cause fixed: stale overlay files deleted before generation: PASS
+V8.2 FIX VALIDATION
+===================
+Current GitHub error fixed:
+- azureClient.ts imports JsonRecord: PRESENT
+- types.ts exports JsonRecord: PASS
+- types.ts exports SelfServiceLogger: PASS
 
-Screenshot errors eliminated by design:
-- discovery/network/subnets.ts legacy file: REMOVED
-- discovery/network/virtualNetworks.ts legacy file: REMOVED
-- services/appService/deploy.ts legacy file: REMOVED
-- services/storageAccount/deploy.ts legacy file: REMOVED
-- services/virtualMachine/deploy.ts legacy file: REMOVED
-- validation.ts subscriptionId import: REMOVED
-
-Additional protection:
-- Workflow removes stale overlay files: PASS
-- Workflow removes stale generated backend: PASS
-- Preparation script independently removes stale overlay files: PASS
-- Post-generation legacy-file verification: PASS
-- Legacy subscriptionId-from-config grep guard: PASS
+Additional checks:
+- All local backend TypeScript imports resolve to files: PASS
+- Legacy V6/V7 services absent: PASS
+- Legacy validation.ts absent: PASS
+- Multi-subscription routing preserved: PASS
+- Business Managed entitlement logic preserved: PASS
+- Existing/New Resource Group logic preserved: PASS
+- VNet/Subnet discovery preserved: PASS
+- Preparation script checks JsonRecord type contract: PASS
+- Workflow checks JsonRecord type contract before yarn tsc: PASS
 - GitHub Actions YAML parse: PASS
-- Preparation script Python syntax: PASS
+- Preparation script syntax: PASS
 
-Expected V8 backend files:
-- azureClient.ts
-- config.ts
-- index.ts
-- naming.ts
-- router.ts
-- types.ts
-- routing/subscription.ts
-- discovery/network.ts
-- discovery/resourceGroups.ts
+GitHub Actions will still run the complete yarn tsc against the actual Backstage dependency graph before build/deploy.

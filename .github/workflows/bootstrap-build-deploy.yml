@@ -73,6 +73,20 @@ jobs:
 
           echo "V8.1 Self-Service backend layout verified."
 
+          if grep -q "JsonRecord" backstage/packages/backend/src/selfService/azureClient.ts; then
+            if ! grep -q "export type JsonRecord" backstage/packages/backend/src/selfService/types.ts; then
+              echo "ERROR: JsonRecord is imported by azureClient.ts but not exported by types.ts"
+              exit 1
+            fi
+          fi
+
+          if ! grep -q "SelfServiceLogger" backstage/packages/backend/src/selfService/types.ts; then
+            echo "ERROR: SelfServiceLogger is missing from types.ts"
+            exit 1
+          fi
+
+          echo "V8.2 shared type contract verified."
+
       - name: Force safe runtime configuration
         shell: bash
         run: |
