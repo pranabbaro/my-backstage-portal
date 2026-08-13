@@ -1,10 +1,9 @@
 import { JsonRecord } from '../../types';
 import {
   validateLocation,
-  validateResourceGroup,
-  validateSimpleName,
   validateSubnetId,
 } from '../../validation';
+import { buildNamingPreview } from '../../naming/namingEngine';
 import { VirtualMachineRequest } from './model';
 
 const ALLOWED_VM_SIZES = [
@@ -16,37 +15,46 @@ const ALLOWED_VM_SIZES = [
 export function validateVirtualMachineRequest(
   input: JsonRecord,
 ): VirtualMachineRequest {
-  const request: VirtualMachineRequest = {
-    resourceGroup: validateResourceGroup(
-      String(input.resourceGroup || ''),
-    ),
-    location: validateLocation(String(input.location || '')),
-    name: validateSimpleName(String(input.name || ''), 'VM name', 15),
-    vmSize: String(input.vmSize || 'Standard_B2s'),
-    adminUsername: String(
-      input.adminUsername || 'azureadmin',
-    ).trim(),
-    subnetResourceId: validateSubnetId(
-      String(input.subnetResourceId || ''),
-    ),
-    sshPublicKey: String(input.sshPublicKey || '').trim(),
-  };
+  const location = validateLocation(String(input.location || ''));
+  const names = buildNamingPreview({
+    workload: String(input.workload || ''),
+    environment: String(input.environment || ''),
+    location,
+    instance: String(input.instance || '01'),
+  });
 
-  if (!ALLOWED_VM_SIZES.includes(request.vmSize)) {
+  const vmSize = String(input.vmSize || 'Standard_B2s');
+  const adminUsername = String(input.adminUsername || 'azureadmin').trim();
+  const subnetResourceId = validateSubnetId(
+    String(input.subnetResourceId || ''),
+  );
+  const sshPublicKey = String(input.sshPublicKey || '').trim();
+
+  if (!ALLOWED_VM_SIZES.includes(vmSize)) {
     throw new Error(
-      `VM size '${request.vmSize}' is not approved. Allowed: ${ALLOWED_VM_SIZES.join(
-        ', ',
-      )}`,
+      `VM size '${vmSize}' is not approved. Allowed: ${ALLOWED_VM_SIZES.join(', ')}`,
     );
   }
 
-  if (!/^[a-zA-Z][a-zA-Z0-9_-]{2,31}$/.test(request.adminUsername)) {
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]{2,31}$/.test(adminUsername)) {
     throw new Error('Invalid administrator username');
   }
 
-  if (!request.sshPublicKey.startsWith('ssh-')) {
+  if (!sshPublicKey.startsWith('ssh-')) {
     throw new Error('A valid SSH public key is required');
   }
 
-  return request;
+  return {
+    workload: names.workload,
+    environment: names.environment,
+    instance: names.instance,
+    resourceGroup: names.resourceGroup,
+    location,
+    name: names.virtualMachine,
+    networkInterfaceName: names.networkInterface,
+    vmSize,
+    adminUsername,
+    subnetResourceId,
+    sshPublicKey,
+  };
 }

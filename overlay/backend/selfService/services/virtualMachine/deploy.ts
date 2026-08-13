@@ -6,14 +6,9 @@ export async function deployVirtualMachine(
   request: VirtualMachineRequest,
 ) {
   const sub = subscriptionId();
+  await ensureResourceGroup(request.resourceGroup, request.location);
 
-  await ensureResourceGroup(
-    request.resourceGroup,
-    request.location,
-  );
-
-  const nicName = `${request.name}-nic`;
-
+  const nicName = request.networkInterfaceName;
   const nic = await arm(
     'PUT',
     `/subscriptions/${sub}/resourceGroups/${encodeURIComponent(
@@ -27,6 +22,8 @@ export async function deployVirtualMachine(
       tags: {
         ManagedBy: 'Backstage',
         ServiceType: 'VM-NIC',
+        Workload: request.workload,
+        Environment: request.environment,
       },
       properties: {
         enableAcceleratedNetworking: false,
@@ -35,9 +32,7 @@ export async function deployVirtualMachine(
             name: 'ipconfig1',
             properties: {
               privateIPAllocationMethod: 'Dynamic',
-              subnet: {
-                id: request.subnetResourceId,
-              },
+              subnet: { id: request.subnetResourceId },
             },
           },
         ],
@@ -62,11 +57,11 @@ export async function deployVirtualMachine(
       tags: {
         ManagedBy: 'Backstage',
         ServiceType: 'VirtualMachine',
+        Workload: request.workload,
+        Environment: request.environment,
       },
       properties: {
-        hardwareProfile: {
-          vmSize: request.vmSize,
-        },
+        hardwareProfile: { vmSize: request.vmSize },
         storageProfile: {
           imageReference: {
             publisher: 'Canonical',
@@ -76,9 +71,7 @@ export async function deployVirtualMachine(
           },
           osDisk: {
             createOption: 'FromImage',
-            managedDisk: {
-              storageAccountType: 'Premium_LRS',
-            },
+            managedDisk: { storageAccountType: 'Premium_LRS' },
           },
         },
         osProfile: {
@@ -98,12 +91,7 @@ export async function deployVirtualMachine(
         },
         networkProfile: {
           networkInterfaces: [
-            {
-              id: nicId,
-              properties: {
-                primary: true,
-              },
-            },
+            { id: nicId, properties: { primary: true } },
           ],
         },
       },
@@ -112,7 +100,12 @@ export async function deployVirtualMachine(
 
   return {
     message: 'Linux VM deployment accepted',
-    resourceId: `/subscriptions/${sub}/resourceGroups/${request.resourceGroup}/providers/Microsoft.Compute/virtualMachines/${request.name}`,
+    resourceGroup: request.resourceGroup,
+    virtualMachineName: request.name,
+    networkInterfaceName: request.networkInterfaceName,
+    resourceId:
+      `/subscriptions/${sub}/resourceGroups/${request.resourceGroup}` +
+      `/providers/Microsoft.Compute/virtualMachines/${request.name}`,
     networkInterfaceId: nicId,
     azure: vm.data,
   };

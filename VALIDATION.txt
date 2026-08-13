@@ -1,13 +1,18 @@
 Validation performed
 ====================
-TS2322 status-state typing fix applied: PASS
-Frontend generation fixture: PASS
+V7 overlay generation fixture: PASS
+Dynamic VNet discovery module: PASS
+Dynamic Subnet discovery module: PASS
+Central naming engine: PASS
+Backend-enforced VM naming: PASS
+Frontend VNet dropdown: PASS
+Frontend Subnet dropdown: PASS
+Subnet Resource ID kept internal: PASS
+Generated naming preview: PASS
+Existing VM deployment flow preserved: PASS
 Development YAML parse: PASS
 Production YAML parse: PASS
 GitHub Actions YAML parse: PASS
-Preparation script syntax: PASS
-Existing Self-Service routes preserved: PASS
-Modular backend preserved: PASS
-Type-check remains before Azure deployment: PASS
+Type-check/build remain before Azure deployment: PASS
 
-The complete TypeScript compile still runs in GitHub Actions against the user's actual Backstage repository.
+Complete TypeScript compilation will run in GitHub Actions against the actual Backstage dependency graph before deployment.
