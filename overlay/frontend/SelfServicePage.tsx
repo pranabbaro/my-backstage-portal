@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from 'react';
 import {
   Content,
@@ -11,6 +12,7 @@ import {
   useApi,
 } from '@backstage/frontend-plugin-api';
 
+type ServiceType = 'vm' | 'storage' | 'app-service';
 type NetworkType =
   | 'internal'
   | 'intranet'
@@ -45,6 +47,9 @@ type Names = {
   resourceGroup: string;
   virtualMachine: string;
   networkInterface: string;
+  storageAccount: string;
+  appService: string;
+  appServicePlan: string;
 };
 
 type VmSize = {
@@ -90,43 +95,51 @@ const infoBox: React.CSSProperties = {
   border: '1px solid #d7d7d7',
 };
 
-function inr(value: number | null): string {
-  if (value === null) return 'Price unavailable';
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+const services: Array<{
+  id: ServiceType;
+  title: string;
+  category: string;
+  description: string;
+}> = [
+  {
+    id: 'vm',
+    title: 'Virtual Machine',
+    category: 'Compute',
+    description:
+      'Deploy a Linux virtual machine with approved sizing, network placement and naming.',
+  },
+  {
+    id: 'storage',
+    title: 'Storage Account',
+    category: 'Storage',
+    description:
+      'Deploy a secure StorageV2 account with approved redundancy and access settings.',
+  },
+  {
+    id: 'app-service',
+    title: 'App Service',
+    category: 'Web',
+    description:
+      'Deploy a Linux App Service and App Service Plan with approved runtime and plan SKU.',
+  },
+];
+
+function money(value: number | null) {
+  if (value === null) return 'Unavailable';
+  return `₹${value.toLocaleString('en-IN', {
     maximumFractionDigits: 2,
-  }).format(value);
+  })}`;
 }
 
 export const SelfServicePage = () => {
   const fetchApi = useApi(fetchApiRef);
 
-  const [config, setConfig] = useState<PlatformConfig | null>(null);
+  const [service, setService] = useState<ServiceType | null>(null);
+  const [cfg, setCfg] = useState<PlatformConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] =
     useState<Record<string, unknown> | null>(null);
-
-  const [businessSubscriptions, setBusinessSubscriptions] =
-    useState<Subscription[]>([]);
-  const [autoSubscription, setAutoSubscription] =
-    useState<Subscription | null>(null);
-
-  const [resourceGroups, setResourceGroups] =
-    useState<ResourceGroup[]>([]);
-  const [resourceGroupLoading, setResourceGroupLoading] =
-    useState(false);
-  const [resourceGroupMessage, setResourceGroupMessage] =
-    useState('');
-  const [vnets, setVnets] = useState<VNet[]>([]);
-  const [subnets, setSubnets] = useState<Subnet[]>([]);
-  const [generatedNames, setGeneratedNames] =
-    useState<Names | null>(null);
-  const [placementError, setPlacementError] = useState('');
-
-  const [vmSizes, setVmSizes] = useState<VmSize[]>([]);
-  const [vmSizesLoading, setVmSizesLoading] = useState(false);
-  const [vmSizeMessage, setVmSizeMessage] = useState('');
+  const [search, setSearch] = useState('');
 
   const [form, setForm] = useState({
     workload: 'backstage',
@@ -137,19 +150,43 @@ export const SelfServicePage = () => {
     subscriptionId: '',
     resourceGroupMode: 'new' as 'existing' | 'new',
     resourceGroup: '',
+
     vnetId: '',
     subnetResourceId: '',
     vmSize: 'Standard_B2s',
     adminUsername: 'azureadmin',
     sshPublicKey: '',
+
+    redundancy: 'Standard_LRS',
+    accessTier: 'Hot',
+    storagePublicNetworkAccess: 'Enabled',
+
+    planSku: 'B1',
+    runtime: 'NODE|22-lts',
+    appPublicNetworkAccess: 'Enabled',
   });
+
+  const [autoSub, setAutoSub] = useState<Subscription | null>(null);
+  const [businessSubs, setBusinessSubs] = useState<Subscription[]>([]);
+  const [rgs, setRgs] = useState<ResourceGroup[]>([]);
+  const [vnets, setVnets] = useState<VNet[]>([]);
+  const [subnets, setSubnets] = useState<Subnet[]>([]);
+  const [names, setNames] = useState<Names | null>(null);
+  const [vmSizes, setVmSizes] = useState<VmSize[]>([]);
+  const [vmSizeMessage, setVmSizeMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [vmSizesLoading, setVmSizesLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const locations =
+    cfg?.allowedLocations || ['centralindia', 'southindia', 'westindia'];
 
   useEffect(() => {
     fetchApi
       .fetch('/api/azure-self-service/config')
       .then(response => response.json())
-      .then(body => setConfig(body as PlatformConfig))
-      .catch(() => setConfig(null));
+      .then(body => setCfg(body as PlatformConfig))
+      .catch(err => setError(String(err)));
   }, [fetchApi]);
 
   useEffect(() => {
@@ -163,10 +200,10 @@ export const SelfServicePage = () => {
     fetchApi
       .fetch(`/api/azure-self-service/naming/preview?${query}`)
       .then(async response => {
-        if (!response.ok) throw new Error();
-        setGeneratedNames((await response.json()) as Names);
+        if (!response.ok) throw new Error('Naming preview failed');
+        setNames((await response.json()) as Names);
       })
-      .catch(() => setGeneratedNames(null));
+      .catch(() => setNames(null));
   }, [
     fetchApi,
     form.workload,
@@ -175,17 +212,15 @@ export const SelfServicePage = () => {
     form.instance,
   ]);
 
-  // Existing V8 subscription routing is intentionally preserved.
   useEffect(() => {
-    if (!config?.managedIdentity) return;
+    if (!cfg?.managedIdentity) return;
 
-    setPlacementError('');
-    setAutoSubscription(null);
-    setBusinessSubscriptions([]);
-    setResourceGroups([]);
+    setAutoSub(null);
+    setBusinessSubs([]);
+    setRgs([]);
     setVnets([]);
     setSubnets([]);
-    setVmSizes([]);
+    setError('');
 
     setForm(current => ({
       ...current,
@@ -197,23 +232,17 @@ export const SelfServicePage = () => {
 
     if (form.networkType === 'business-managed') {
       fetchApi
-        .fetch(
-          '/api/azure-self-service/subscriptions/business-managed',
-        )
+        .fetch('/api/azure-self-service/subscriptions/business-managed')
         .then(async response => {
-          const body = (await response.json()) as {
-            value?: Subscription[];
-            error?: string;
-          };
+          const body = await response.json();
           if (!response.ok) {
             throw new Error(
-              body.error ||
-                'Unable to load assigned subscriptions',
+              body.error || 'Unable to load assigned subscriptions',
             );
           }
-          setBusinessSubscriptions(body.value || []);
+          setBusinessSubs(body.value || []);
         })
-        .catch(error => setPlacementError(String(error)));
+        .catch(err => setError(String(err)));
 
       return;
     }
@@ -224,51 +253,36 @@ export const SelfServicePage = () => {
     });
 
     fetchApi
-      .fetch(
-        `/api/azure-self-service/subscriptions/resolve?${query}`,
-      )
+      .fetch(`/api/azure-self-service/subscriptions/resolve?${query}`)
       .then(async response => {
-        const body = (await response.json()) as {
-          subscription?: Subscription;
-          error?: string;
-        };
-        if (!response.ok || !body.subscription) {
-          throw new Error(
-            body.error || 'Unable to resolve subscription',
-          );
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.error || 'Unable to resolve subscription');
         }
-        setAutoSubscription(body.subscription);
+        setAutoSub(body.subscription);
         setForm(current => ({
           ...current,
-          subscriptionId:
-            body.subscription?.subscriptionId || '',
+          subscriptionId: body.subscription.subscriptionId,
         }));
       })
-      .catch(error => setPlacementError(String(error)));
-  }, [
-    fetchApi,
-    config?.managedIdentity,
-    form.networkType,
-    form.location,
-  ]);
+      .catch(err => setError(String(err)));
+  }, [fetchApi, cfg?.managedIdentity, form.networkType, form.location]);
 
   const activeSubscription =
     form.networkType === 'business-managed'
       ? form.subscriptionId
-      : autoSubscription?.subscriptionId || '';
+      : autoSub?.subscriptionId || '';
 
-  // VNet discovery and VM-size details use the resolved subscription.
   useEffect(() => {
     if (!activeSubscription) return;
 
+    setRgs([]);
     setVnets([]);
     setSubnets([]);
-    setVmSizes([]);
-    setVmSizesLoading(true);
-    setVmSizeMessage('');
 
     setForm(current => ({
       ...current,
+      resourceGroup: '',
       vnetId: '',
       subnetResourceId: '',
     }));
@@ -279,110 +293,22 @@ export const SelfServicePage = () => {
     });
 
     fetchApi
-      .fetch(`/api/azure-self-service/network/vnets?${query}`)
+      .fetch(`/api/azure-self-service/resource-groups/accessible?${query}`)
       .then(response => response.json())
-      .then(body => setVnets((body.value || []) as VNet[]))
-      .catch(() => setVnets([]));
+      .then(body => setRgs(body.value || []))
+      .catch(() => setRgs([]));
 
-    fetchApi
-      .fetch(`/api/azure-self-service/vm-sizes?${query}`)
-      .then(async response => {
-        const body = (await response.json()) as {
-          value?: VmSize[];
-          pricingNote?: string;
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(body.error || 'Unable to load VM sizes');
-        }
-        const sizes = body.value || [];
-        setVmSizes(sizes);
-        setVmSizeMessage(body.pricingNote || '');
-
-        if (
-          sizes.length > 0 &&
-          !sizes.some(size => size.name === form.vmSize)
-        ) {
-          setForm(current => ({
-            ...current,
-            vmSize: sizes[0].name,
-          }));
-        }
-      })
-      .catch(error => {
-        setVmSizes([]);
-        setVmSizeMessage(String(error));
-      })
-      .finally(() => setVmSizesLoading(false));
-  }, [fetchApi, activeSubscription, form.location]);
-
-  // Existing RGs are loaded only when Existing is selected.
-  // For now, the list is discovered by the backend using Managed Identity.
-  // End-user Azure RBAC filtering can be added later without changing deployment identity.
-  useEffect(() => {
-    if (
-      form.resourceGroupMode !== 'existing' ||
-      !activeSubscription
-    ) {
-      setResourceGroups([]);
-      setResourceGroupMessage('');
-      return;
+    if (service === 'vm') {
+      fetchApi
+        .fetch(`/api/azure-self-service/network/vnets?${query}`)
+        .then(response => response.json())
+        .then(body => setVnets(body.value || []))
+        .catch(() => setVnets([]));
     }
-
-    let cancelled = false;
-
-    const load = async () => {
-      setResourceGroupLoading(true);
-      setResourceGroups([]);
-      setResourceGroupMessage('');
-      setForm(current => ({ ...current, resourceGroup: '' }));
-
-      const query = new URLSearchParams({
-        subscriptionId: activeSubscription,
-        location: form.location,
-      });
-
-      try {
-        const response = await fetchApi.fetch(
-          `/api/azure-self-service/resource-groups/accessible?${query}`,
-        );
-
-        const body = (await response.json()) as {
-          value?: ResourceGroup[];
-          error?: string;
-        };
-
-        if (!response.ok) {
-          throw new Error(body.error || 'Unable to load Resource Groups');
-        }
-
-        if (cancelled) return;
-
-        setResourceGroups(body.value || []);
-      } catch (error) {
-        if (!cancelled) {
-          setResourceGroups([]);
-          setResourceGroupMessage(String(error));
-        }
-      } finally {
-        if (!cancelled) setResourceGroupLoading(false);
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    fetchApi,
-    form.resourceGroupMode,
-    activeSubscription,
-    form.location,
-  ]);
+  }, [fetchApi, activeSubscription, form.location, service]);
 
   useEffect(() => {
-    if (!form.vnetId) {
+    if (service !== 'vm' || !form.vnetId) {
       setSubnets([]);
       return;
     }
@@ -399,76 +325,202 @@ export const SelfServicePage = () => {
         )}`,
       )
       .then(response => response.json())
-      .then(body => setSubnets((body.value || []) as Subnet[]))
+      .then(body => setSubnets(body.value || []))
       .catch(() => setSubnets([]));
-  }, [fetchApi, form.vnetId]);
+  }, [fetchApi, service, form.vnetId]);
 
-  const selectedVmSize = useMemo(
-    () => vmSizes.find(size => size.name === form.vmSize) || null,
-    [vmSizes, form.vmSize],
-  );
+  useEffect(() => {
+    if (service !== 'vm' || !activeSubscription) {
+      setVmSizes([]);
+      return;
+    }
 
-  const ready = Boolean(
+    setVmSizesLoading(true);
+
+    const query = new URLSearchParams({
+      subscriptionId: activeSubscription,
+      location: form.location,
+    });
+
+    fetchApi
+      .fetch(`/api/azure-self-service/vm-sizes?${query}`)
+      .then(async response => {
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.error || 'Unable to load VM sizes');
+        }
+
+        const sizes = body.value || [];
+        setVmSizes(sizes);
+        setVmSizeMessage(body.pricingNote || '');
+
+        if (
+          sizes.length > 0 &&
+          !sizes.some((size: VmSize) => size.name === form.vmSize)
+        ) {
+          setForm(current => ({
+            ...current,
+            vmSize: sizes[0].name,
+          }));
+        }
+      })
+      .catch(err => {
+        setVmSizes([]);
+        setVmSizeMessage(String(err));
+      })
+      .finally(() => setVmSizesLoading(false));
+  }, [fetchApi, service, activeSubscription, form.location]);
+
+  const selectedVmSize = vmSizes.find(size => size.name === form.vmSize);
+
+  const filteredServices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return services;
+    return services.filter(item =>
+      `${item.title} ${item.category} ${item.description}`
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [search]);
+
+  const sharedReady = Boolean(
     activeSubscription &&
-      form.subnetResourceId &&
-      form.sshPublicKey.trim() &&
-      generatedNames &&
-      selectedVmSize &&
+      names &&
       (form.resourceGroupMode === 'new' || form.resourceGroup),
   );
 
+  const ready = Boolean(
+    sharedReady &&
+      (service === 'vm'
+        ? form.subnetResourceId &&
+          form.sshPublicKey.trim() &&
+          selectedVmSize
+        : service === 'storage'
+          ? form.redundancy && form.accessTier
+          : service === 'app-service'
+            ? form.planSku && form.runtime
+            : false),
+  );
+
   const deploy = async () => {
+    if (!service) return;
+
     setBusy(true);
     setStatus(null);
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+      let endpoint = '';
+      let payload: Record<string, unknown> = {
+        workload: form.workload,
+        environment: form.environment,
+        location: form.location,
+        instance: form.instance,
+        networkType: form.networkType,
+        subscriptionId: activeSubscription,
+        resourceGroupMode: form.resourceGroupMode,
+        resourceGroup: form.resourceGroup,
       };
 
-      const response = await fetchApi.fetch(
-        '/api/azure-self-service/deploy/vm',
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            ...form,
-            subscriptionId: activeSubscription,
-          }),
+      if (service === 'vm') {
+        endpoint = '/api/azure-self-service/deploy/vm';
+        payload = {
+          ...payload,
+          subnetResourceId: form.subnetResourceId,
+          vmSize: form.vmSize,
+          adminUsername: form.adminUsername,
+          sshPublicKey: form.sshPublicKey,
+        };
+      }
+
+      if (service === 'storage') {
+        endpoint = '/api/azure-self-service/deploy/storage';
+        payload = {
+          ...payload,
+          redundancy: form.redundancy,
+          accessTier: form.accessTier,
+          publicNetworkAccess: form.storagePublicNetworkAccess,
+        };
+      }
+
+      if (service === 'app-service') {
+        endpoint = '/api/azure-self-service/deploy/app-service';
+        payload = {
+          ...payload,
+          planSku: form.planSku,
+          runtime: form.runtime,
+          publicNetworkAccess: form.appPublicNetworkAccess,
+        };
+      }
+
+      const response = await fetchApi.fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify(payload),
+      });
 
       setStatus(
         (await response.json()) as Record<string, unknown>,
       );
-    } catch (error) {
-      setStatus({ error: String(error) });
+    } catch (err) {
+      setStatus({ error: String(err) });
     } finally {
       setBusy(false);
     }
   };
 
+  const ServiceCard = ({
+    item,
+  }: {
+    item: (typeof services)[number];
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        setService(item.id);
+        setStatus(null);
+        setError('');
+      }}
+      style={{
+        textAlign: 'left',
+        padding: 20,
+        minHeight: 155,
+        background: '#fff',
+        border:
+          service === item.id
+            ? '2px solid #0078d4'
+            : '1px solid #d7d7d7',
+        cursor: 'pointer',
+      }}
+    >
+      <div style={{ fontSize: 19, fontWeight: 600 }}>{item.title}</div>
+      <div style={{ marginTop: 5, fontSize: 13 }}>{item.category}</div>
+      <div style={{ marginTop: 12, lineHeight: 1.45 }}>
+        {item.description}
+      </div>
+    </button>
+  );
+
   return (
     <Page themeId="tool">
       <Header
         title="Self-Service Market"
-        subtitle="Approved cloud placement and deployment"
+        subtitle="Approved Azure services and enterprise placement"
       />
 
       <Content>
         <InfoCard title="Platform readiness">
-          {!config ? (
+          {!cfg ? (
             <Progress />
           ) : (
             <div>
               Managed Identity:{' '}
-              <b>
-                {config.managedIdentity ? 'Ready' : 'Not configured'}
-              </b>
+              <b>{cfg.managedIdentity ? 'Ready' : 'Not configured'}</b>
               {' | '}
               Subscription routing:{' '}
               <b>
-                {config.subscriptionRoutingConfigured
+                {cfg.subscriptionRoutingConfigured
                   ? 'Ready'
                   : 'Not configured'}
               </b>
@@ -476,355 +528,574 @@ export const SelfServicePage = () => {
           )}
         </InfoCard>
 
-        <div style={{ height: 20 }} />
-        <h2>Create Virtual Machine</h2>
-
-        <div style={grid}>
+        <div style={{ marginTop: 28 }}>
+          <h1 style={{ marginBottom: 6 }}>Azure Marketplace</h1>
           <div>
-            <label style={label}>Application / Workload</label>
-            <input
-              style={input}
-              value={form.workload}
-              onChange={event =>
-                setForm({ ...form, workload: event.target.value })
-              }
-            />
-          </div>
-
-          <div>
-            <label style={label}>Environment</label>
-            <select
-              style={input}
-              value={form.environment}
-              onChange={event =>
-                setForm({ ...form, environment: event.target.value })
-              }
-            >
-              <option value="development">Development</option>
-              <option value="test">Test</option>
-              <option value="staging">Staging</option>
-              <option value="production">Production</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={label}>Region</label>
-            <select
-              style={input}
-              value={form.location}
-              onChange={event =>
-                setForm({ ...form, location: event.target.value })
-              }
-            >
-              {(
-                config?.allowedLocations || [
-                  'centralindia',
-                  'southindia',
-                  'westindia',
-                ]
-              ).map(location => (
-                <option key={location}>{location}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={label}>Instance</label>
-            <input
-              style={input}
-              value={form.instance}
-              onChange={event =>
-                setForm({ ...form, instance: event.target.value })
-              }
-            />
+            Choose an Azure service. Each service shows only the properties
+            relevant to that resource.
           </div>
         </div>
 
-        <h3>Network Connection Type</h3>
-        <select
-          style={input}
-          value={form.networkType}
-          onChange={event =>
-            setForm({
-              ...form,
-              networkType: event.target.value as NetworkType,
-            })
-          }
+        <input
+          style={{ ...input, marginTop: 18, maxWidth: 720 }}
+          placeholder="Search Azure services"
+          value={search}
+          onChange={event => setSearch(event.target.value)}
+        />
+
+        <div
+          style={{
+            ...grid,
+            marginTop: 20,
+          }}
         >
-          <option value="internal">Internal</option>
-          <option value="intranet">Intranet</option>
-          <option value="dmz">DMZ</option>
-          <option value="business-managed">Business Managed</option>
-        </select>
+          {filteredServices.map(item => (
+            <ServiceCard key={item.id} item={item} />
+          ))}
+        </div>
 
-        <h3>Target Subscription</h3>
-        {form.networkType === 'business-managed' ? (
-          <select
-            style={input}
-            value={form.subscriptionId}
-            onChange={event =>
-              setForm({
-                ...form,
-                subscriptionId: event.target.value,
-              })
-            }
-          >
-            <option value="">Select an assigned subscription</option>
-            {businessSubscriptions.map(subscription => (
-              <option
-                key={subscription.subscriptionId}
-                value={subscription.subscriptionId}
-              >
-                {subscription.displayName}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <div style={infoBox}>
-            <b>
-              {autoSubscription?.displayName ||
-                'Resolving subscription...'}
-            </b>
-            <div>Automatically selected by placement policy.</div>
+        {!service && (
+          <div style={{ ...infoBox, marginTop: 28 }}>
+            Select a service above to open its deployment form.
           </div>
         )}
 
-        {placementError && (
-          <div style={{ marginTop: 8 }}>{placementError}</div>
-        )}
-
-        <h3>Resource Group</h3>
-        <label>
-          <input
-            type="radio"
-            checked={form.resourceGroupMode === 'existing'}
-            onChange={() =>
-              setForm({
-                ...form,
-                resourceGroupMode: 'existing',
-                resourceGroup: '',
-              })
-            }
-          />{' '}
-          Use existing
-        </label>{' '}
-        <label>
-          <input
-            type="radio"
-            checked={form.resourceGroupMode === 'new'}
-            onChange={() =>
-              setForm({
-                ...form,
-                resourceGroupMode: 'new',
-                resourceGroup: '',
-              })
-            }
-          />{' '}
-          Create new
-        </label>
-
-        {form.resourceGroupMode === 'existing' ? (
-          <>
-            {resourceGroupLoading && <Progress />}
-            <select
-              style={{ ...input, marginTop: 10 }}
-              value={form.resourceGroup}
-              disabled={resourceGroupLoading || resourceGroups.length === 0}
-              onChange={event =>
-                setForm({
-                  ...form,
-                  resourceGroup: event.target.value,
-                })
-              }
-            >
-              <option value="">
-                {resourceGroups.length === 0
-                  ? 'No Resource Groups found'
-                  : 'Select an existing Resource Group'}
-              </option>
-              {resourceGroups.map(resourceGroup => (
-                <option
-                  key={resourceGroup.id}
-                  value={resourceGroup.name}
-                >
-                  {resourceGroup.name}
-                </option>
-              ))}
-            </select>
-            {resourceGroupMessage && (
-              <div style={{ marginTop: 7, fontSize: 13 }}>
-                {resourceGroupMessage}
-              </div>
-            )}
-          </>
-        ) : (
-          <div style={{ ...infoBox, marginTop: 10 }}>
-            <b>{generatedNames?.resourceGroup || 'Generating...'}</b>
-          </div>
-        )}
-
-        <h3>Network</h3>
-        <div style={grid}>
-          <div>
-            <label style={label}>Virtual Network</label>
-            <select
-              style={input}
-              value={form.vnetId}
-              onChange={event =>
-                setForm({ ...form, vnetId: event.target.value })
-              }
-            >
-              <option value="">Select a VNet</option>
-              {vnets.map(vnet => (
-                <option key={vnet.id} value={vnet.id}>
-                  {vnet.name} — {vnet.resourceGroup}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={label}>Subnet</label>
-            <select
-              style={input}
-              value={form.subnetResourceId}
-              disabled={!form.vnetId}
-              onChange={event =>
-                setForm({
-                  ...form,
-                  subnetResourceId: event.target.value,
-                })
-              }
-            >
-              <option value="">Select a subnet</option>
-              {subnets.map(subnet => (
-                <option key={subnet.id} value={subnet.id}>
-                  {subnet.name}
-                  {subnet.addressPrefixes.length
-                    ? ` — ${subnet.addressPrefixes.join(', ')}`
-                    : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <h3>Generated Names</h3>
-        <div style={infoBox}>
-          VM:{' '}
-          <b>{generatedNames?.virtualMachine || 'Generating...'}</b>
-          <br />
-          NIC:{' '}
-          <b>{generatedNames?.networkInterface || 'Generating...'}</b>
-        </div>
-
-        <h3>Compute</h3>
-        <div style={grid}>
-          <div>
-            <label style={label}>VM Size</label>
-            {vmSizesLoading ? (
-              <Progress />
-            ) : (
-              <select
-                style={input}
-                value={form.vmSize}
-                disabled={vmSizes.length === 0}
-                onChange={event =>
-                  setForm({ ...form, vmSize: event.target.value })
-                }
-              >
-                {vmSizes.length === 0 ? (
-                  <option value="">No approved VM sizes available</option>
-                ) : (
-                  vmSizes.map(size => (
-                    <option key={size.name} value={size.name}>
-                      {size.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            )}
-          </div>
-
-          <div>
-            <label style={label}>Administrator Username</label>
-            <input
-              style={input}
-              value={form.adminUsername}
-              onChange={event =>
-                setForm({
-                  ...form,
-                  adminUsername: event.target.value,
-                })
-              }
-            />
-          </div>
-        </div>
-
-        {selectedVmSize && (
-          <div style={{ ...infoBox, marginTop: 16 }}>
-            <div style={grid}>
-              <div>
-                <strong>vCPU</strong>
-                <div>{selectedVmSize.vcpus ?? 'Unavailable'}</div>
-              </div>
-              <div>
-                <strong>RAM</strong>
-                <div>
-                  {selectedVmSize.memoryGB === null
-                    ? 'Unavailable'
-                    : `${selectedVmSize.memoryGB} GB`}
-                </div>
-              </div>
-              <div>
-                <strong>Estimated hourly compute</strong>
-                <div>{inr(selectedVmSize.hourlyPrice)}</div>
-              </div>
-              <div>
-                <strong>Estimated monthly compute</strong>
-                <div>{inr(selectedVmSize.monthlyPrice)}</div>
-              </div>
-            </div>
-            <div style={{ marginTop: 10, fontSize: 12 }}>
-              {vmSizeMessage ||
-                'Retail compute estimate only; additional Azure charges may apply.'}
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginTop: 18 }}>
-          <label style={label}>SSH Public Key</label>
-          <textarea
-            style={{ ...input, minHeight: 90 }}
-            value={form.sshPublicKey}
-            onChange={event =>
-              setForm({ ...form, sshPublicKey: event.target.value })
-            }
-          />
-        </div>
-
-        <button
-          type="button"
-          disabled={busy || !ready}
-          onClick={deploy}
-          style={{ marginTop: 22, padding: '10px 22px' }}
-        >
-          {busy ? 'Deploying...' : 'Deploy Virtual Machine'}
-        </button>
-
-        {busy && <Progress />}
-
-        {status && (
-          <pre
+        {service && (
+          <div
             style={{
-              marginTop: 18,
-              padding: 14,
-              background: '#f5f5f5',
-              whiteSpace: 'pre-wrap',
+              marginTop: 30,
+              border: '1px solid #d7d7d7',
+              padding: 24,
+              background: '#fff',
             }}
           >
-            {JSON.stringify(status, null, 2)}
-          </pre>
+            <h2>
+              {service === 'vm'
+                ? 'Create Virtual Machine'
+                : service === 'storage'
+                  ? 'Create Storage Account'
+                  : 'Create App Service'}
+            </h2>
+
+            <h3>Placement</h3>
+            <div style={grid}>
+              <div>
+                <label style={label}>Application / Workload</label>
+                <input
+                  style={input}
+                  value={form.workload}
+                  onChange={event =>
+                    setForm({
+                      ...form,
+                      workload: event.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div>
+                <label style={label}>Environment</label>
+                <select
+                  style={input}
+                  value={form.environment}
+                  onChange={event =>
+                    setForm({
+                      ...form,
+                      environment: event.target.value,
+                    })
+                  }
+                >
+                  <option value="development">Development</option>
+                  <option value="test">Test</option>
+                  <option value="staging">Staging</option>
+                  <option value="production">Production</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={label}>Region</label>
+                <select
+                  style={input}
+                  value={form.location}
+                  onChange={event =>
+                    setForm({
+                      ...form,
+                      location: event.target.value,
+                    })
+                  }
+                >
+                  {locations.map(location => (
+                    <option key={location} value={location}>
+                      {location}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={label}>Instance</label>
+                <input
+                  style={input}
+                  value={form.instance}
+                  onChange={event =>
+                    setForm({
+                      ...form,
+                      instance: event.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            <h3>Network Connection Type</h3>
+            <select
+              style={input}
+              value={form.networkType}
+              onChange={event =>
+                setForm({
+                  ...form,
+                  networkType: event.target.value as NetworkType,
+                })
+              }
+            >
+              <option value="internal">Internal</option>
+              <option value="intranet">Intranet</option>
+              <option value="dmz">DMZ</option>
+              <option value="business-managed">
+                Business Managed
+              </option>
+            </select>
+
+            <h3>Target Subscription</h3>
+            {form.networkType === 'business-managed' ? (
+              <select
+                style={input}
+                value={form.subscriptionId}
+                onChange={event =>
+                  setForm({
+                    ...form,
+                    subscriptionId: event.target.value,
+                  })
+                }
+              >
+                <option value="">Select an assigned subscription</option>
+                {businessSubs.map(subscription => (
+                  <option
+                    key={subscription.subscriptionId}
+                    value={subscription.subscriptionId}
+                  >
+                    {subscription.displayName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={infoBox}>
+                <b>{autoSub?.displayName || 'Resolving...'}</b>
+              </div>
+            )}
+
+            {error && (
+              <div style={{ marginTop: 10 }}>
+                {error}
+              </div>
+            )}
+
+            <h3>Resource Group</h3>
+            <label>
+              <input
+                type="radio"
+                checked={form.resourceGroupMode === 'existing'}
+                onChange={() =>
+                  setForm({
+                    ...form,
+                    resourceGroupMode: 'existing',
+                  })
+                }
+              />{' '}
+              Use existing
+            </label>{' '}
+            <label>
+              <input
+                type="radio"
+                checked={form.resourceGroupMode === 'new'}
+                onChange={() =>
+                  setForm({
+                    ...form,
+                    resourceGroupMode: 'new',
+                    resourceGroup: '',
+                  })
+                }
+              />{' '}
+              Create new
+            </label>
+
+            {form.resourceGroupMode === 'existing' ? (
+              <select
+                style={{ ...input, marginTop: 10 }}
+                value={form.resourceGroup}
+                onChange={event =>
+                  setForm({
+                    ...form,
+                    resourceGroup: event.target.value,
+                  })
+                }
+              >
+                <option value="">
+                  {rgs.length === 0
+                    ? 'No Resource Groups found'
+                    : 'Select an existing Resource Group'}
+                </option>
+                {rgs.map(rg => (
+                  <option key={rg.id} value={rg.name}>
+                    {rg.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ ...infoBox, marginTop: 10 }}>
+                <b>{names?.resourceGroup || 'Generating...'}</b>
+              </div>
+            )}
+
+            {service === 'vm' && (
+              <>
+                <h3>Network</h3>
+                <div style={grid}>
+                  <div>
+                    <label style={label}>Virtual Network</label>
+                    <select
+                      style={input}
+                      value={form.vnetId}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          vnetId: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select a VNet</option>
+                      {vnets.map(vnet => (
+                        <option key={vnet.id} value={vnet.id}>
+                          {vnet.name} — {vnet.resourceGroup}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>Subnet</label>
+                    <select
+                      style={input}
+                      value={form.subnetResourceId}
+                      disabled={!form.vnetId}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          subnetResourceId: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select a subnet</option>
+                      {subnets.map(subnet => (
+                        <option key={subnet.id} value={subnet.id}>
+                          {subnet.name}
+                          {subnet.addressPrefixes.length
+                            ? ` — ${subnet.addressPrefixes.join(', ')}`
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <h3>Generated Names</h3>
+                <div style={infoBox}>
+                  VM: <b>{names?.virtualMachine || 'Generating...'}</b>
+                  <br />
+                  NIC: <b>{names?.networkInterface || 'Generating...'}</b>
+                </div>
+
+                <h3>Compute</h3>
+                <div style={grid}>
+                  <div>
+                    <label style={label}>VM Size</label>
+                    {vmSizesLoading ? (
+                      <Progress />
+                    ) : (
+                      <select
+                        style={input}
+                        value={form.vmSize}
+                        onChange={event =>
+                          setForm({
+                            ...form,
+                            vmSize: event.target.value,
+                          })
+                        }
+                      >
+                        {vmSizes.length === 0 ? (
+                          <option value="">
+                            No approved VM sizes available
+                          </option>
+                        ) : (
+                          vmSizes.map(size => (
+                            <option key={size.name} value={size.name}>
+                              {size.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={label}>Administrator Username</label>
+                    <input
+                      style={input}
+                      value={form.adminUsername}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          adminUsername: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {selectedVmSize && (
+                  <div style={{ ...infoBox, marginTop: 16 }}>
+                    <div style={grid}>
+                      <div>
+                        <strong>vCPU</strong>
+                        <div>{selectedVmSize.vcpus ?? 'Unavailable'}</div>
+                      </div>
+                      <div>
+                        <strong>RAM</strong>
+                        <div>
+                          {selectedVmSize.memoryGB === null
+                            ? 'Unavailable'
+                            : `${selectedVmSize.memoryGB} GB`}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Estimated hourly compute</strong>
+                        <div>{money(selectedVmSize.hourlyPrice)}</div>
+                      </div>
+                      <div>
+                        <strong>Estimated monthly compute</strong>
+                        <div>{money(selectedVmSize.monthlyPrice)}</div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: 12 }}>
+                      {vmSizeMessage ||
+                        'Retail compute estimate only; additional Azure charges may apply.'}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 18 }}>
+                  <label style={label}>SSH Public Key</label>
+                  <textarea
+                    style={{ ...input, minHeight: 90 }}
+                    value={form.sshPublicKey}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        sshPublicKey: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </>
+            )}
+
+            {service === 'storage' && (
+              <>
+                <h3>Generated Name</h3>
+                <div style={infoBox}>
+                  Storage Account:{' '}
+                  <b>{names?.storageAccount || 'Generating...'}</b>
+                </div>
+
+                <h3>Storage Configuration</h3>
+                <div style={grid}>
+                  <div>
+                    <label style={label}>Redundancy</label>
+                    <select
+                      style={input}
+                      value={form.redundancy}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          redundancy: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="Standard_LRS">
+                        Standard LRS
+                      </option>
+                      <option value="Standard_ZRS">
+                        Standard ZRS
+                      </option>
+                      <option value="Standard_GRS">
+                        Standard GRS
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>Access Tier</label>
+                    <select
+                      style={input}
+                      value={form.accessTier}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          accessTier: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="Hot">Hot</option>
+                      <option value="Cool">Cool</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>Public Network Access</label>
+                    <select
+                      style={input}
+                      value={form.storagePublicNetworkAccess}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          storagePublicNetworkAccess: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="Enabled">Enabled</option>
+                      <option value="Disabled">Disabled</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ ...infoBox, marginTop: 16 }}>
+                  HTTPS only, TLS 1.2 minimum, and Blob public access disabled
+                  are enforced automatically.
+                </div>
+              </>
+            )}
+
+            {service === 'app-service' && (
+              <>
+                <h3>Generated Names</h3>
+                <div style={infoBox}>
+                  App Service:{' '}
+                  <b>{names?.appService || 'Generating...'}</b>
+                  <br />
+                  App Service Plan:{' '}
+                  <b>{names?.appServicePlan || 'Generating...'}</b>
+                </div>
+
+                <h3>App Service Configuration</h3>
+                <div style={grid}>
+                  <div>
+                    <label style={label}>App Service Plan SKU</label>
+                    <select
+                      style={input}
+                      value={form.planSku}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          planSku: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="B1">B1</option>
+                      <option value="P1v3">P1v3</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>Runtime</label>
+                    <select
+                      style={input}
+                      value={form.runtime}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          runtime: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="NODE|20-lts">Node.js 20 LTS</option>
+                      <option value="NODE|22-lts">Node.js 22 LTS</option>
+                      <option value="PYTHON|3.12">Python 3.12</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>Public Network Access</label>
+                    <select
+                      style={input}
+                      value={form.appPublicNetworkAccess}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          appPublicNetworkAccess: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="Enabled">Enabled</option>
+                      <option value="Disabled">Disabled</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ ...infoBox, marginTop: 16 }}>
+                  HTTPS only, TLS 1.2 minimum, FTPS disabled, and a
+                  System-Assigned Managed Identity are enforced automatically.
+                </div>
+              </>
+            )}
+
+            <button
+              type="button"
+              disabled={busy || !ready}
+              onClick={deploy}
+              style={{
+                marginTop: 24,
+                padding: '11px 22px',
+                background: ready ? '#0078d4' : '#bcbcbc',
+                color: '#fff',
+                border: 0,
+                fontWeight: 600,
+              }}
+            >
+              {busy
+                ? 'Deploying...'
+                : service === 'vm'
+                  ? 'Deploy Virtual Machine'
+                  : service === 'storage'
+                    ? 'Deploy Storage Account'
+                    : 'Deploy App Service'}
+            </button>
+
+            {busy && <Progress />}
+
+            {status && (
+              <pre
+                style={{
+                  marginTop: 18,
+                  padding: 14,
+                  background: '#f5f5f5',
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {JSON.stringify(status, null, 2)}
+              </pre>
+            )}
+          </div>
         )}
       </Content>
     </Page>

@@ -19,6 +19,8 @@ import {
   assertApprovedVmSize,
   listApprovedVmSizes,
 } from './vmCatalog';
+import { deployStorageAccount } from './services/storageAccount';
+import { deployAppService } from './services/appService';
 
 function validLocation(raw: string) {
   const value = raw.toLowerCase();
@@ -59,6 +61,46 @@ async function businessSubscriptions(
   };
 }
 
+
+
+async function resolveTargetSubscription(
+  body: Record<string, unknown>,
+  req: any,
+  httpAuth: HttpAuthService,
+  userInfo: UserInfoService,
+  location: string,
+): Promise<string> {
+  const networkType = String(body.networkType || '') as NetworkType;
+
+  if (networkType === 'business-managed') {
+    const entitled = await businessSubscriptions(req, httpAuth, userInfo);
+    const requested = String(body.subscriptionId || '');
+    const found = entitled.value.find(
+      subscription =>
+        subscription.subscriptionId.toLowerCase() ===
+        requested.toLowerCase(),
+    );
+
+    if (!found) {
+      throw new Error(
+        'Requested Business Managed subscription is not assigned to this user',
+      );
+    }
+
+    return found.subscriptionId;
+  }
+
+  if (!['internal', 'intranet', 'dmz'].includes(networkType)) {
+    throw new Error('Invalid Network Connection Type');
+  }
+
+  return (
+    await resolvePlatformSubscription(
+      networkType as 'internal' | 'intranet' | 'dmz',
+      location,
+    )
+  ).subscriptionId;
+}
 
 export function createSelfServiceRouter(
   logger: SelfServiceLogger,
@@ -420,6 +462,74 @@ export function createSelfServiceRouter(
       });
     } catch (error) {
       logger.error(`VM deployment failed: ${String(error)}`);
+      res.status(400).json({ error: String(error) });
+    }
+  });
+
+  router.post('/deploy/storage', async (req, res) => {
+    try {
+      const body = (req.body || {}) as Record<string, unknown>;
+      const location = validLocation(String(body.location || ''));
+      const subscriptionId = await resolveTargetSubscription(
+        body,
+        req,
+        httpAuth,
+        userInfo,
+        location,
+      );
+
+      const result = await deployStorageAccount({
+        subscriptionId,
+        resourceGroupMode: String(body.resourceGroupMode || 'new'),
+        resourceGroup: String(body.resourceGroup || ''),
+        workload: String(body.workload || ''),
+        environment: String(body.environment || ''),
+        location,
+        instance: String(body.instance || '01'),
+        redundancy: String(body.redundancy || 'Standard_LRS'),
+        accessTier: String(body.accessTier || 'Hot'),
+        publicNetworkAccess: String(
+          body.publicNetworkAccess || 'Enabled',
+        ),
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error(`Storage Account deployment failed: ${String(error)}`);
+      res.status(400).json({ error: String(error) });
+    }
+  });
+
+  router.post('/deploy/app-service', async (req, res) => {
+    try {
+      const body = (req.body || {}) as Record<string, unknown>;
+      const location = validLocation(String(body.location || ''));
+      const subscriptionId = await resolveTargetSubscription(
+        body,
+        req,
+        httpAuth,
+        userInfo,
+        location,
+      );
+
+      const result = await deployAppService({
+        subscriptionId,
+        resourceGroupMode: String(body.resourceGroupMode || 'new'),
+        resourceGroup: String(body.resourceGroup || ''),
+        workload: String(body.workload || ''),
+        environment: String(body.environment || ''),
+        location,
+        instance: String(body.instance || '01'),
+        planSku: String(body.planSku || 'B1'),
+        runtime: String(body.runtime || 'NODE|22-lts'),
+        publicNetworkAccess: String(
+          body.publicNetworkAccess || 'Enabled',
+        ),
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error(`App Service deployment failed: ${String(error)}`);
       res.status(400).json({ error: String(error) });
     }
   });

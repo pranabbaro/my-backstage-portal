@@ -19,10 +19,21 @@ export function names(workloadRaw:string, environmentRaw:string, locationRaw:str
   const digits = instanceRaw.replace(/\D/g,'') || '1';
   const instance = String(Number(digits)).padStart(2,'0');
   const suffix = `${workload}-${ENV[environment]}-${REGION[location]}-${instance}`;
+  const storageAccount =
+    `st${workload}${ENV[environment]}${REGION[location]}${instance}`
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 24);
+
   return {
-    workload, environment, location, instance,
+    workload,
+    environment,
+    location,
+    instance,
     resourceGroup:`rg-${workload}-${ENV[environment]}-${REGION[location]}`,
     virtualMachine:`vm-${suffix}`.slice(0,64),
     networkInterface:`nic-${suffix}`.slice(0,80),
+    storageAccount,
+    appService:`app-${suffix}`.slice(0,60),
+    appServicePlan:`asp-${workload}-${ENV[environment]}-${REGION[location]}`.slice(0,40),
   };
 }

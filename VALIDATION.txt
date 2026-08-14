@@ -1,26 +1,41 @@
-V9.2 VALIDATION
-===============
-Existing RG behavior:
-- No Microsoft delegated auth prompt: PASS
-- RG list comes from Managed Identity discovery: PASS
-- Existing RG user-RBAC filtering temporarily removed: PASS
-- Subscription routing unchanged: PASS
-- Business Managed subscription behavior unchanged: PASS
+V10 VALIDATION
+==============
+Marketplace:
+- Virtual Machine card: PASS
+- Storage Account card: PASS
+- App Service card: PASS
+- Resource-specific forms: PASS
 
-New RG behavior:
-- Generated RG naming preserved: PASS
-- Informational "No end-user RG access restriction..." message removed: PASS
+Shared enterprise behavior:
+- Existing/New RG selection: PASS
+- Managed Identity RG discovery: PASS
+- Subscription routing preserved: PASS
+- Business Managed subscription path preserved: PASS
+- Naming standards shared: PASS
 
-VM size/cost UX:
-- VM dropdown displays only VM size: PASS
-- vCPU detail appears after selection: PASS
-- RAM detail appears after selection: PASS
-- Hourly compute estimate appears after selection: PASS
-- Monthly compute estimate appears after selection: PASS
+VM:
+- VNet/Subnet fields only on VM form: PASS
+- VM size dropdown: PASS
+- CPU/RAM/cost detail panel: PASS
+- SSH key: PASS
 
-Deployment:
-- Managed Identity remains deployment identity: PASS
-- VNet/Subnet discovery preserved: PASS
+Storage:
+- No VM-specific fields: PASS
+- Redundancy: PASS
+- Access tier: PASS
+- Public network access: PASS
+- TLS/HTTPS/public blob security defaults: PASS
+- Storage ARM deployment route: PASS
+
+App Service:
+- No VM-specific fields: PASS
+- Plan SKU: PASS
+- Runtime: PASS
+- Public network access: PASS
+- HTTPS/TLS/FTPS/SystemAssigned identity defaults: PASS
+- App Service ARM deployment route: PASS
+
+Build safety:
 - Local backend imports resolve: PASS
 - Workflow YAML parse: PASS
-- Preparation script syntax: PASS
+- Preparation scripts syntax: PASS
