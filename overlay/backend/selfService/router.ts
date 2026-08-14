@@ -14,10 +14,7 @@ import {
 } from './routing/subscription';
 import { listSubnets, listVnets } from './discovery/network';
 import { names } from './naming';
-import {
-  assertUserCanSelectExistingRg,
-  listUserAccessibleResourceGroups,
-} from './userRgAccess';
+import { listResourceGroups } from './discovery/resourceGroups';
 import {
   assertApprovedVmSize,
   listApprovedVmSizes,
@@ -62,11 +59,6 @@ async function businessSubscriptions(
   };
 }
 
-function azureUserToken(req: {
-  header(name: string): string | undefined;
-}): string | undefined {
-  return req.header('x-azure-user-token')?.trim() || undefined;
-}
 
 export function createSelfServiceRouter(
   logger: SelfServiceLogger,
@@ -137,15 +129,15 @@ export function createSelfServiceRouter(
     }
   });
 
-  // Existing RG only: Managed Identity gets the candidate list, while the
-  // signed-in user's delegated Azure token is used only to check visibility.
-  // If no delegated token is available, an explicit user/group entitlement
-  // map can be used. No token + no entitlement = empty list.
+  // Existing RG discovery.
+  // Managed Identity lists Resource Groups in the already resolved/selected
+  // subscription. End-user Azure RBAC filtering can be reintroduced later.
   router.get('/resource-groups/accessible', async (req, res) => {
     try {
       const subscriptionId = String(
         req.query.subscriptionId || '',
       ).trim();
+
       if (!subscriptionId) {
         throw new Error('subscriptionId is required');
       }
@@ -154,25 +146,15 @@ export function createSelfServiceRouter(
         ? validLocation(String(req.query.location))
         : undefined;
 
-      const info = await currentUser(req, httpAuth, userInfo);
-      const result = await listUserAccessibleResourceGroups({
-        subscriptionId,
-        location,
-        userEntityRef: info.userEntityRef,
-        ownershipEntityRefs: info.ownershipEntityRefs,
-        azureUserToken: azureUserToken(req),
-      });
-
       res.json({
-        userEntityRef: info.userEntityRef,
-        mode: result.mode,
-        value: result.value,
+        mode: 'managed-identity',
+        value: await listResourceGroups(subscriptionId, location),
       });
     } catch (error) {
       logger.error(
-        `Accessible Resource Group discovery failed: ${String(error)}`,
+        `Resource Group discovery failed: ${String(error)}`,
       );
-      res.status(403).json({
+      res.status(400).json({
         error: String(error),
         value: [],
       });
@@ -300,20 +282,6 @@ export function createSelfServiceRouter(
         throw new Error('Resource Group is required');
       }
 
-      // User access has NO bearing on deployment permissions. This check is
-      // only for Existing RG selection. Managed Identity still performs every
-      // Azure create/update operation below.
-      if (resourceGroupMode === 'existing') {
-        const info = await currentUser(req, httpAuth, userInfo);
-        await assertUserCanSelectExistingRg({
-          subscriptionId,
-          resourceGroup,
-          location,
-          userEntityRef: info.userEntityRef,
-          ownershipEntityRefs: info.ownershipEntityRefs,
-          azureUserToken: azureUserToken(req),
-        });
-      }
 
       const subnetId = String(body.subnetResourceId || '');
       if (

@@ -6,7 +6,6 @@ import {
   Page,
   Progress,
 } from '@backstage/core-components';
-import { microsoftAuthApiRef } from '@backstage/core-plugin-api';
 import {
   fetchApiRef,
   useApi,
@@ -102,7 +101,6 @@ function inr(value: number | null): string {
 
 export const SelfServicePage = () => {
   const fetchApi = useApi(fetchApiRef);
-  const microsoftAuthApi = useApi(microsoftAuthApiRef);
 
   const [config, setConfig] = useState<PlatformConfig | null>(null);
   const [busy, setBusy] = useState(false);
@@ -318,9 +316,9 @@ export const SelfServicePage = () => {
       .finally(() => setVmSizesLoading(false));
   }, [fetchApi, activeSubscription, form.location]);
 
-  // Existing RGs are loaded ONLY when Existing is selected.
-  // The user token is used only for RG visibility; deployment continues
-  // to use Managed Identity.
+  // Existing RGs are loaded only when Existing is selected.
+  // For now, the list is discovered by the backend using Managed Identity.
+  // End-user Azure RBAC filtering can be added later without changing deployment identity.
   useEffect(() => {
     if (
       form.resourceGroupMode !== 'existing' ||
@@ -328,7 +326,7 @@ export const SelfServicePage = () => {
     ) {
       setResourceGroups([]);
       setResourceGroupMessage('');
-        return;
+      return;
     }
 
     let cancelled = false;
@@ -336,21 +334,9 @@ export const SelfServicePage = () => {
     const load = async () => {
       setResourceGroupLoading(true);
       setResourceGroups([]);
-      setResourceGroupMessage('Checking your Resource Group access...');
+      setResourceGroupMessage('');
       setForm(current => ({ ...current, resourceGroup: '' }));
 
-      let token: string | undefined;
-      try {
-        token = await microsoftAuthApi.getAccessToken(
-          'https://management.azure.com/user_impersonation',
-        );
-      } catch {
-        // Microsoft delegated auth is optional. The backend will use the
-        // explicit entitlement-map fallback, or return an empty list.
-        token = undefined;
-      }
-
-      if (cancelled) return;
       const query = new URLSearchParams({
         subscriptionId: activeSubscription,
         location: form.location,
@@ -359,45 +345,20 @@ export const SelfServicePage = () => {
       try {
         const response = await fetchApi.fetch(
           `/api/azure-self-service/resource-groups/accessible?${query}`,
-          {
-            headers: token
-              ? { 'x-azure-user-token': token }
-              : undefined,
-          },
         );
 
         const body = (await response.json()) as {
           value?: ResourceGroup[];
-          mode?: 'azure-rbac' | 'entitlement-map' | 'none';
           error?: string;
         };
 
         if (!response.ok) {
-          throw new Error(body.error || 'Unable to check RG access');
+          throw new Error(body.error || 'Unable to load Resource Groups');
         }
 
         if (cancelled) return;
 
-        const value = body.value || [];
-        setResourceGroups(value);
-
-        if (value.length === 0) {
-          setResourceGroupMessage(
-            'No accessible Resource Groups found for the signed-in user in this subscription and region.',
-          );
-        } else if (body.mode === 'azure-rbac') {
-          setResourceGroupMessage(
-            'Showing only Resource Groups accessible to your Azure user identity.',
-          );
-        } else if (body.mode === 'entitlement-map') {
-          setResourceGroupMessage(
-            'Showing only Resource Groups assigned to your Backstage user/group.',
-          );
-        } else {
-          setResourceGroupMessage(
-            'No Resource Groups are assigned to the signed-in user.',
-          );
-        }
+        setResourceGroups(body.value || []);
       } catch (error) {
         if (!cancelled) {
           setResourceGroups([]);
@@ -415,7 +376,6 @@ export const SelfServicePage = () => {
     };
   }, [
     fetchApi,
-    microsoftAuthApi,
     form.resourceGroupMode,
     activeSubscription,
     form.location,
@@ -465,18 +425,6 @@ export const SelfServicePage = () => {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-
-      if (form.resourceGroupMode === 'existing') {
-        try {
-          const token = await microsoftAuthApi.getAccessToken(
-            'https://management.azure.com/user_impersonation',
-          );
-          headers['x-azure-user-token'] = token;
-        } catch {
-          // No delegated token: backend revalidation falls back to explicit
-          // Backstage user/group RG entitlements, or denies the selection.
-        }
-      }
 
       const response = await fetchApi.fetch(
         '/api/azure-self-service/deploy/vm',
@@ -691,7 +639,7 @@ export const SelfServicePage = () => {
             >
               <option value="">
                 {resourceGroups.length === 0
-                  ? 'No accessible Resource Groups'
+                  ? 'No Resource Groups found'
                   : 'Select an existing Resource Group'}
               </option>
               {resourceGroups.map(resourceGroup => (
@@ -712,10 +660,6 @@ export const SelfServicePage = () => {
         ) : (
           <div style={{ ...infoBox, marginTop: 10 }}>
             <b>{generatedNames?.resourceGroup || 'Generating...'}</b>
-            <div>
-              No end-user RG access restriction. Managed Identity creates
-              this Resource Group.
-            </div>
           </div>
         )}
 
@@ -794,11 +738,7 @@ export const SelfServicePage = () => {
                 ) : (
                   vmSizes.map(size => (
                     <option key={size.name} value={size.name}>
-                      {size.name} — {size.vcpus ?? '?'} vCPU —{' '}
-                      {size.memoryGB ?? '?'} GB RAM
-                      {size.hourlyPrice !== null
-                        ? ` — ${inr(size.hourlyPrice)}/hr`
-                        : ''}
+                      {size.name}
                     </option>
                   ))
                 )}

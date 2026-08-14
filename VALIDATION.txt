@@ -1,23 +1,26 @@
-V9.1 VALIDATION
+V9.2 VALIDATION
 ===============
-Current GitHub TS2677 vmCatalog error: FIXED
-
-Fix applied:
-- Promise callback explicitly returns Promise<VmSizeOption | null>: PASS
-- Returned SKU name normalized to string: PASS
-- Null filtering predicate now operates on VmSizeOption | null: PASS
-
-Preserved V9 functionality:
-- Existing RG user filtering: PASS
-- New RG has no end-user RG restriction: PASS
-- Managed Identity remains deployment identity: PASS
+Existing RG behavior:
+- No Microsoft delegated auth prompt: PASS
+- RG list comes from Managed Identity discovery: PASS
+- Existing RG user-RBAC filtering temporarily removed: PASS
 - Subscription routing unchanged: PASS
 - Business Managed subscription behavior unchanged: PASS
-- VNet/Subnet discovery unchanged: PASS
-- VM vCPU/RAM discovery unchanged: PASS
-- Azure Retail Prices cost lookup unchanged: PASS
 
-Safety:
+New RG behavior:
+- Generated RG naming preserved: PASS
+- Informational "No end-user RG access restriction..." message removed: PASS
+
+VM size/cost UX:
+- VM dropdown displays only VM size: PASS
+- vCPU detail appears after selection: PASS
+- RAM detail appears after selection: PASS
+- Hourly compute estimate appears after selection: PASS
+- Monthly compute estimate appears after selection: PASS
+
+Deployment:
+- Managed Identity remains deployment identity: PASS
+- VNet/Subnet discovery preserved: PASS
+- Local backend imports resolve: PASS
 - Workflow YAML parse: PASS
 - Preparation script syntax: PASS
-- GitHub Actions still runs yarn tsc before build/deploy: PASS
