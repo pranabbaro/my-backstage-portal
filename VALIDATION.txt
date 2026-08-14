@@ -1,41 +1,33 @@
-V10 VALIDATION
-==============
-Marketplace:
-- Virtual Machine card: PASS
-- Storage Account card: PASS
-- App Service card: PASS
-- Resource-specific forms: PASS
+V10.1 VALIDATION
+================
+GitHub errors fixed:
+- Frontend unused 'loading' state: REMOVED
+- Frontend unused 'setLoading' state: REMOVED
+- services/storageAccount.ts preserved by cleanup: PASS
+- services/appService.ts preserved by cleanup: PASS
+- Router imports resolve to real modules: PASS
 
-Shared enterprise behavior:
+Marketplace preserved:
+- Virtual Machine: PASS
+- Storage Account: PASS
+- App Service: PASS
+
+Resource-specific UX preserved:
+- VM-only VNet/Subnet/SSH/VM Size: PASS
+- VM CPU/RAM/cost detail panel: PASS
+- Storage redundancy/access tier/public-network properties: PASS
+- App Service plan/runtime/public-network properties: PASS
+
+Shared platform behavior preserved:
+- Subscription routing: PASS
+- Business Managed subscription path: PASS
 - Existing/New RG selection: PASS
-- Managed Identity RG discovery: PASS
-- Subscription routing preserved: PASS
-- Business Managed subscription path preserved: PASS
-- Naming standards shared: PASS
-
-VM:
-- VNet/Subnet fields only on VM form: PASS
-- VM size dropdown: PASS
-- CPU/RAM/cost detail panel: PASS
-- SSH key: PASS
-
-Storage:
-- No VM-specific fields: PASS
-- Redundancy: PASS
-- Access tier: PASS
-- Public network access: PASS
-- TLS/HTTPS/public blob security defaults: PASS
-- Storage ARM deployment route: PASS
-
-App Service:
-- No VM-specific fields: PASS
-- Plan SKU: PASS
-- Runtime: PASS
-- Public network access: PASS
-- HTTPS/TLS/FTPS/SystemAssigned identity defaults: PASS
-- App Service ARM deployment route: PASS
+- Managed Identity deployment: PASS
+- Naming standards: PASS
 
 Build safety:
+- Preparation script now requires V10 service modules after copy: PASS
+- Workflow verifies V10 service modules before TypeScript: PASS
 - Local backend imports resolve: PASS
 - Workflow YAML parse: PASS
-- Preparation scripts syntax: PASS
+- Preparation script syntax: PASS

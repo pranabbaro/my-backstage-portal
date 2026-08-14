@@ -34,7 +34,9 @@ jobs:
           rm -rf backstage/packages/backend/src/selfService
           rm -f backstage/packages/backend/src/selfServicePlugin.ts
 
-          rm -rf overlay/backend/selfService/services
+          rm -rf overlay/backend/selfService/services/appService
+          rm -rf overlay/backend/selfService/services/storageAccount
+          rm -rf overlay/backend/selfService/services/virtualMachine
           rm -rf overlay/backend/selfService/discovery/network
           rm -rf overlay/backend/selfService/discovery/resourceGroups
           rm -f overlay/backend/selfService/validation.ts
@@ -50,11 +52,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -d backstage/packages/backend/src/selfService/services ]; then
-            echo "ERROR: legacy services directory still exists"
-            find backstage/packages/backend/src/selfService/services -type f
+          if [ -d backstage/packages/backend/src/selfService/services/appService ] ||              [ -d backstage/packages/backend/src/selfService/services/storageAccount ] ||              [ -d backstage/packages/backend/src/selfService/services/virtualMachine ]; then
+            echo "ERROR: legacy nested services directory still exists"
+            find backstage/packages/backend/src/selfService/services -type f || true
             exit 1
           fi
+
+          test -f backstage/packages/backend/src/selfService/services/storageAccount.ts
+          test -f backstage/packages/backend/src/selfService/services/appService.ts
+          echo "V10 resource service modules present."
 
           if [ -d backstage/packages/backend/src/selfService/discovery/network ]; then
             echo "ERROR: legacy discovery/network directory still exists"

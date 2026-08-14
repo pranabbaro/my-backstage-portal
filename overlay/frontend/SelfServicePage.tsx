@@ -174,7 +174,6 @@ export const SelfServicePage = () => {
   const [names, setNames] = useState<Names | null>(null);
   const [vmSizes, setVmSizes] = useState<VmSize[]>([]);
   const [vmSizeMessage, setVmSizeMessage] = useState('');
-  const [loading, setLoading] = useState(false);
   const [vmSizesLoading, setVmSizesLoading] = useState(false);
   const [error, setError] = useState('');
 

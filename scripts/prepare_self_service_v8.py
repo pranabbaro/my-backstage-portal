@@ -20,7 +20,9 @@ backend=bs/'packages/backend/src'
 overlay_self_service=repo/'overlay/backend/selfService'
 
 legacy_overlay_paths=[
-    overlay_self_service/'services',
+    overlay_self_service/'services/appService',
+    overlay_self_service/'services/storageAccount',
+    overlay_self_service/'services/virtualMachine',
     overlay_self_service/'discovery/network',
     overlay_self_service/'discovery/resourceGroups',
     overlay_self_service/'validation.ts',
@@ -91,9 +93,14 @@ if legacy_plugin.exists():
 shutil.copytree(repo/'overlay/backend/selfService',target)
 shutil.copy2(repo/'overlay/backend/selfServicePlugin.ts',backend/'selfServicePlugin.ts')
 
-# Verify that the generated backend contains ONLY V8 layout.
+# Verify that no legacy nested V6/V7 modules survived.
+# V10 intentionally uses flat service modules:
+#   services/storageAccount.ts
+#   services/appService.ts
 for forbidden in [
-    target/'services',
+    target/'services/appService',
+    target/'services/storageAccount',
+    target/'services/virtualMachine',
     target/'discovery/network',
     target/'discovery/resourceGroups',
     target/'validation.ts',
@@ -101,6 +108,16 @@ for forbidden in [
     if forbidden.exists():
         print(f'ERROR: legacy generated Self-Service path exists: {forbidden}')
         sys.exit(1)
+
+for required in [
+    target/'services/storageAccount.ts',
+    target/'services/appService.ts',
+]:
+    if not required.exists():
+        print(f'ERROR: required V10 service module is missing: {required}')
+        sys.exit(1)
+
+print('V10 service modules copied successfully.')
 
 print('Legacy V6/V7 Self-Service files removed successfully.')
 
