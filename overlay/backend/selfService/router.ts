@@ -351,7 +351,7 @@ export function createSelfServiceRouter(
       }
 
       const vmSize = String(body.vmSize || 'Standard_B2s');
-      assertApprovedVmSize(vmSize);
+      await assertApprovedVmSize(subscriptionId, location, vmSize);
 
       if (resourceGroupMode === 'new') {
         await ensureResourceGroup(

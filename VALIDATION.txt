@@ -1,32 +1,20 @@
-V10.2 FAST VM CATALOG VALIDATION
-================================
-VM size UX:
-- VM Size dropdown renders immediately: PASS
-- Dropdown does not wait for Azure pricing: PASS
-- Dropdown shows only VM size name: PASS
-- CPU/RAM details remain below selected size: PASS
-- Hourly/monthly cost remains below selected size: PASS
-- Metadata/pricing load in background: PASS
-- Metadata/pricing failure does not disable size selection: PASS
+V10.3 VALIDATION
+================
+Current TypeScript error fixed:
+- assertApprovedVmSize now called with subscriptionId, location, vmSize: PASS
 
-Performance:
-- Backend VM catalog cache: PASS
-- Cache TTL: 6 hours
-- Approved size list is local and immediate: PASS
-- Azure SKU lookup is background metadata only: PASS
-- Azure Retail Prices lookup is background metadata only: PASS
-
-Marketplace preserved:
-- Virtual Machine: PASS
+Preserved:
+- Fast VM size dropdown: PASS
+- CPU/RAM/cost background load: PASS
+- 6-hour VM catalog cache: PASS
+- VM deployment: PASS
 - Storage Account: PASS
 - App Service: PASS
-
-Shared behavior preserved:
-- Subscription routing: PASS
 - Existing/New RG: PASS
-- VNet/Subnet: PASS
-- Naming: PASS
+- Subscription routing: PASS
+- Business Managed path: PASS
 - Managed Identity deployment: PASS
+- Naming standards: PASS
 
 Build safety:
 - Local backend imports resolve: PASS
