@@ -35,5 +35,10 @@ export function names(workloadRaw:string, environmentRaw:string, locationRaw:str
     storageAccount,
     appService:`app-${suffix}`.slice(0,60),
     appServicePlan:`asp-${workload}-${ENV[environment]}-${REGION[location]}`.slice(0,40),
+    keyVault:`kv-${suffix}`
+      .replace(/-+/g, '-')
+      .replace(/-$/g, '')
+      .slice(0,24)
+      .replace(/-$/g, ''),
   };
 }

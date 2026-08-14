@@ -2,7 +2,7 @@
 import { JsonRecord } from './types';
 const MANAGEMENT='https://management.azure.com';
 
-async function token():Promise<string> {
+export async function managedIdentityToken():Promise<string> {
   const endpoint=process.env.IDENTITY_ENDPOINT;
   const header=process.env.IDENTITY_HEADER;
   if (!endpoint || !header) throw new Error('Azure App Service Managed Identity is unavailable');
@@ -15,8 +15,44 @@ async function token():Promise<string> {
   return d.access_token;
 }
 
+
+export async function managedIdentityTenantId(): Promise<string> {
+  const configured = process.env.AZURE_TENANT_ID?.trim();
+
+  if (configured) {
+    return configured;
+  }
+
+  const auth = await managedIdentityToken();
+  const parts = auth.split('.');
+
+  if (parts.length < 2) {
+    throw new Error(
+      'Unable to determine Azure tenant ID from Managed Identity token',
+    );
+  }
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(parts[1], 'base64url').toString('utf8'),
+    ) as {
+      tid?: string;
+    };
+
+    if (!payload.tid) {
+      throw new Error('Managed Identity token has no tid claim');
+    }
+
+    return payload.tid;
+  } catch (error) {
+    throw new Error(
+      `Unable to determine Azure tenant ID: ${String(error)}`,
+    );
+  }
+}
+
 export async function arm(method:string,path:string,apiVersion:string,body?:JsonRecord) {
-  const auth=await token();
+  const auth=await managedIdentityToken();
   const url=`${MANAGEMENT}${path}${path.includes('?')?'&':'?'}api-version=${encodeURIComponent(apiVersion)}`;
   const r=await fetch(url,{
     method,

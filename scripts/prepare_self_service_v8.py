@@ -112,6 +112,7 @@ for forbidden in [
 for required in [
     target/'services/storageAccount.ts',
     target/'services/appService.ts',
+    target/'services/keyVault.ts',
 ]:
     if not required.exists():
         print(f'ERROR: required V10 service module is missing: {required}')

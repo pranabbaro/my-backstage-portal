@@ -12,7 +12,7 @@ import {
   useApi,
 } from '@backstage/frontend-plugin-api';
 
-type ServiceType = 'vm' | 'storage' | 'app-service';
+type ServiceType = 'vm' | 'storage' | 'app-service' | 'key-vault';
 type NetworkType =
   | 'internal'
   | 'intranet'
@@ -50,6 +50,7 @@ type Names = {
   storageAccount: string;
   appService: string;
   appServicePlan: string;
+  keyVault: string;
 };
 
 type VmSize = {
@@ -122,6 +123,13 @@ const services: Array<{
     description:
       'Deploy a Linux App Service and App Service Plan with approved runtime and plan SKU.',
   },
+  {
+    id: 'key-vault',
+    title: 'Key Vault',
+    category: 'Security',
+    description:
+      'Deploy an Azure Key Vault using RBAC authorization, soft delete and approved security settings.',
+  },
 ];
 
 const APPROVED_VM_SIZE_NAMES = [
@@ -170,6 +178,11 @@ export const SelfServicePage = () => {
     planSku: 'B1',
     runtime: 'NODE|22-lts',
     appPublicNetworkAccess: 'Enabled',
+
+    keyVaultSku: 'standard',
+    keyVaultSoftDeleteRetention: '90',
+    keyVaultPurgeProtection: 'Enabled',
+    keyVaultPublicNetworkAccess: 'Enabled',
   });
 
   const [autoSub, setAutoSub] = useState<Subscription | null>(null);
@@ -423,7 +436,11 @@ export const SelfServicePage = () => {
           ? form.redundancy && form.accessTier
           : service === 'app-service'
             ? form.planSku && form.runtime
-            : false),
+            : service === 'key-vault'
+              ? form.keyVaultSku &&
+                form.keyVaultSoftDeleteRetention &&
+                form.keyVaultPublicNetworkAccess
+              : false),
   );
 
   const deploy = async () => {
@@ -473,6 +490,21 @@ export const SelfServicePage = () => {
           planSku: form.planSku,
           runtime: form.runtime,
           publicNetworkAccess: form.appPublicNetworkAccess,
+        };
+      }
+
+      if (service === 'key-vault') {
+        endpoint = '/api/azure-self-service/deploy/key-vault';
+        payload = {
+          ...payload,
+          sku: form.keyVaultSku,
+          softDeleteRetentionInDays: Number(
+            form.keyVaultSoftDeleteRetention,
+          ),
+          purgeProtection:
+            form.keyVaultPurgeProtection === 'Enabled',
+          publicNetworkAccess:
+            form.keyVaultPublicNetworkAccess,
         };
       }
 
@@ -598,7 +630,9 @@ export const SelfServicePage = () => {
                 ? 'Create Virtual Machine'
                 : service === 'storage'
                   ? 'Create Storage Account'
-                  : 'Create App Service'}
+                  : service === 'app-service'
+                    ? 'Create App Service'
+                    : 'Create Key Vault'}
             </h2>
 
             <h3>Placement</h3>
@@ -1071,6 +1105,103 @@ export const SelfServicePage = () => {
                   HTTPS only, TLS 1.2 minimum, FTPS disabled, and a
                   System-Assigned Managed Identity are enforced automatically.
                 </div>
+
+            {service === 'key-vault' && (
+              <>
+                <h3>Generated Name</h3>
+                <div style={infoBox}>
+                  Key Vault:{' '}
+                  <b>{names?.keyVault || 'Generating...'}</b>
+                </div>
+
+                <h3>Key Vault Configuration</h3>
+                <div style={grid}>
+                  <div>
+                    <label style={label}>SKU</label>
+                    <select
+                      style={input}
+                      value={form.keyVaultSku}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          keyVaultSku: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="standard">Standard</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>
+                      Soft Delete Retention
+                    </label>
+                    <select
+                      style={input}
+                      value={form.keyVaultSoftDeleteRetention}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          keyVaultSoftDeleteRetention:
+                            event.target.value,
+                        })
+                      }
+                    >
+                      <option value="7">7 days</option>
+                      <option value="30">30 days</option>
+                      <option value="90">90 days</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>
+                      Purge Protection
+                    </label>
+                    <select
+                      style={input}
+                      value={form.keyVaultPurgeProtection}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          keyVaultPurgeProtection:
+                            event.target.value,
+                        })
+                      }
+                    >
+                      <option value="Enabled">Enabled</option>
+                      <option value="Disabled">Disabled</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>
+                      Public Network Access
+                    </label>
+                    <select
+                      style={input}
+                      value={form.keyVaultPublicNetworkAccess}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          keyVaultPublicNetworkAccess:
+                            event.target.value,
+                        })
+                      }
+                    >
+                      <option value="Enabled">Enabled</option>
+                      <option value="Disabled">Disabled</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ ...infoBox, marginTop: 16 }}>
+                  Azure RBAC authorization and soft delete are enabled
+                  automatically.
+                </div>
+              </>
+            )}
+
               </>
             )}
 
@@ -1093,7 +1224,9 @@ export const SelfServicePage = () => {
                   ? 'Deploy Virtual Machine'
                   : service === 'storage'
                     ? 'Deploy Storage Account'
-                    : 'Deploy App Service'}
+                    : service === 'app-service'
+                      ? 'Deploy App Service'
+                      : 'Deploy Key Vault'}
             </button>
 
             {busy && <Progress />}

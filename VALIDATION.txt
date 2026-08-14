@@ -1,22 +1,38 @@
-V10.3 VALIDATION
-================
-Current TypeScript error fixed:
-- assertApprovedVmSize now called with subscriptionId, location, vmSize: PASS
+V10.4 KEY VAULT VALIDATION
+==========================
+Baseline:
+- Built from V10.3 (V11 not included): PASS
 
-Preserved:
-- Fast VM size dropdown: PASS
-- CPU/RAM/cost background load: PASS
-- 6-hour VM catalog cache: PASS
-- VM deployment: PASS
+Marketplace:
+- Virtual Machine: PASS
 - Storage Account: PASS
 - App Service: PASS
-- Existing/New RG: PASS
-- Subscription routing: PASS
-- Business Managed path: PASS
-- Managed Identity deployment: PASS
-- Naming standards: PASS
+- Key Vault: PASS
+
+Shared Key Vault placement:
+- Existing/New Resource Group: PASS
+- Existing subscription routing preserved: PASS
+- Business Managed path preserved: PASS
+- Managed Identity performs deployment: PASS
+- Central naming standard: PASS
+
+Key Vault-specific properties:
+- Standard/Premium SKU: PASS
+- Soft-delete retention 7/30/90 days: PASS
+- Purge protection Enabled/Disabled: PASS
+- Public network access Enabled/Disabled: PASS
+- Azure RBAC authorization enforced: PASS
+- Soft delete enforced: PASS
+- Empty access-policy list with RBAC model: PASS
+
+Azure integration:
+- Microsoft.KeyVault/vaults API 2024-11-01: PASS
+- Tenant ID resolved from AZURE_TENANT_ID when supplied, otherwise Managed Identity token tid claim: PASS
+- Key Vault name constrained to <=24 characters: PASS
 
 Build safety:
-- Local backend imports resolve: PASS
-- Workflow YAML parse: PASS
-- Preparation scripts syntax: PASS
+- Key Vault service module copied by preparation script: PASS
+- Workflow verifies keyVault.ts exists: PASS
+- Local backend TypeScript imports resolve: PASS
+- Workflow YAML parses: PASS
+- Preparation script syntax: PASS

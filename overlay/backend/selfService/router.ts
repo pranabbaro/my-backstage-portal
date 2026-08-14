@@ -22,6 +22,7 @@ import {
 } from './vmCatalog';
 import { deployStorageAccount } from './services/storageAccount';
 import { deployAppService } from './services/appService';
+import { deployKeyVault } from './services/keyVault';
 
 function validLocation(raw: string) {
   const value = raw.toLowerCase();
@@ -537,6 +538,55 @@ export function createSelfServiceRouter(
       res.json(result);
     } catch (error) {
       logger.error(`App Service deployment failed: ${String(error)}`);
+      res.status(400).json({ error: String(error) });
+    }
+  });
+
+  router.post('/deploy/key-vault', async (req, res) => {
+    try {
+      const body = (req.body || {}) as Record<string, unknown>;
+      const location = validLocation(String(body.location || ''));
+
+      const subscriptionId = await resolveTargetSubscription(
+        body,
+        req,
+        httpAuth,
+        userInfo,
+        location,
+      );
+
+      const retention = Number(
+        body.softDeleteRetentionInDays || 90,
+      );
+
+      const purgeProtection =
+        body.purgeProtection === true ||
+        String(body.purgeProtection).toLowerCase() === 'true' ||
+        String(body.purgeProtection).toLowerCase() === 'enabled';
+
+      const result = await deployKeyVault({
+        subscriptionId,
+        resourceGroupMode: String(
+          body.resourceGroupMode || 'new',
+        ),
+        resourceGroup: String(body.resourceGroup || ''),
+        workload: String(body.workload || ''),
+        environment: String(body.environment || ''),
+        location,
+        instance: String(body.instance || '01'),
+        sku: String(body.sku || 'standard').toLowerCase(),
+        softDeleteRetentionInDays: retention,
+        purgeProtection,
+        publicNetworkAccess: String(
+          body.publicNetworkAccess || 'Enabled',
+        ),
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error(
+        `Key Vault deployment failed: ${String(error)}`,
+      );
       res.status(400).json({ error: String(error) });
     }
   });
