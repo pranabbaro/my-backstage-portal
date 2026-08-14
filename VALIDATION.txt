@@ -1,33 +1,34 @@
-V10.1 VALIDATION
-================
-GitHub errors fixed:
-- Frontend unused 'loading' state: REMOVED
-- Frontend unused 'setLoading' state: REMOVED
-- services/storageAccount.ts preserved by cleanup: PASS
-- services/appService.ts preserved by cleanup: PASS
-- Router imports resolve to real modules: PASS
+V10.2 FAST VM CATALOG VALIDATION
+================================
+VM size UX:
+- VM Size dropdown renders immediately: PASS
+- Dropdown does not wait for Azure pricing: PASS
+- Dropdown shows only VM size name: PASS
+- CPU/RAM details remain below selected size: PASS
+- Hourly/monthly cost remains below selected size: PASS
+- Metadata/pricing load in background: PASS
+- Metadata/pricing failure does not disable size selection: PASS
+
+Performance:
+- Backend VM catalog cache: PASS
+- Cache TTL: 6 hours
+- Approved size list is local and immediate: PASS
+- Azure SKU lookup is background metadata only: PASS
+- Azure Retail Prices lookup is background metadata only: PASS
 
 Marketplace preserved:
 - Virtual Machine: PASS
 - Storage Account: PASS
 - App Service: PASS
 
-Resource-specific UX preserved:
-- VM-only VNet/Subnet/SSH/VM Size: PASS
-- VM CPU/RAM/cost detail panel: PASS
-- Storage redundancy/access tier/public-network properties: PASS
-- App Service plan/runtime/public-network properties: PASS
-
-Shared platform behavior preserved:
+Shared behavior preserved:
 - Subscription routing: PASS
-- Business Managed subscription path: PASS
-- Existing/New RG selection: PASS
+- Existing/New RG: PASS
+- VNet/Subnet: PASS
+- Naming: PASS
 - Managed Identity deployment: PASS
-- Naming standards: PASS
 
 Build safety:
-- Preparation script now requires V10 service modules after copy: PASS
-- Workflow verifies V10 service modules before TypeScript: PASS
 - Local backend imports resolve: PASS
 - Workflow YAML parse: PASS
-- Preparation script syntax: PASS
+- Preparation scripts syntax: PASS

@@ -16,6 +16,7 @@ import { listSubnets, listVnets } from './discovery/network';
 import { names } from './naming';
 import { listResourceGroups } from './discovery/resourceGroups';
 import {
+  approvedVmSizeNames,
   assertApprovedVmSize,
   listApprovedVmSizes,
 } from './vmCatalog';
@@ -231,6 +232,12 @@ export function createSelfServiceRouter(
     } catch (error) {
       res.status(400).json({ error: String(error) });
     }
+  });
+
+  router.get('/vm-size-names', (_req, res) => {
+    res.json({
+      value: approvedVmSizeNames(),
+    });
   });
 
   router.get('/vm-sizes', async (req, res) => {

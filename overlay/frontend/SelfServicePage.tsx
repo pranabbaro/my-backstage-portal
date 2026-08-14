@@ -124,6 +124,12 @@ const services: Array<{
   },
 ];
 
+const APPROVED_VM_SIZE_NAMES = [
+  'Standard_B2s',
+  'Standard_D2s_v5',
+  'Standard_D4s_v5',
+];
+
 function money(value: number | null) {
   if (value === null) return 'Unavailable';
   return `₹${value.toLocaleString('en-IN', {
@@ -172,7 +178,18 @@ export const SelfServicePage = () => {
   const [vnets, setVnets] = useState<VNet[]>([]);
   const [subnets, setSubnets] = useState<Subnet[]>([]);
   const [names, setNames] = useState<Names | null>(null);
-  const [vmSizes, setVmSizes] = useState<VmSize[]>([]);
+  const [vmSizes, setVmSizes] = useState<VmSize[]>(
+    APPROVED_VM_SIZE_NAMES.map(name => ({
+      name,
+      vcpus: null,
+      memoryGB: null,
+      premiumIO: null,
+      hourlyPrice: null,
+      monthlyPrice: null,
+      currencyCode: 'INR',
+      priceSource: 'Unavailable',
+    })),
+  );
   const [vmSizeMessage, setVmSizeMessage] = useState('');
   const [vmSizesLoading, setVmSizesLoading] = useState(false);
   const [error, setError] = useState('');
@@ -330,11 +347,11 @@ export const SelfServicePage = () => {
 
   useEffect(() => {
     if (service !== 'vm' || !activeSubscription) {
-      setVmSizes([]);
       return;
     }
 
     setVmSizesLoading(true);
+    setVmSizeMessage('Loading CPU, RAM and pricing details...');
 
     const query = new URLSearchParams({
       subscriptionId: activeSubscription,
@@ -345,27 +362,35 @@ export const SelfServicePage = () => {
       .fetch(`/api/azure-self-service/vm-sizes?${query}`)
       .then(async response => {
         const body = await response.json();
+
         if (!response.ok) {
-          throw new Error(body.error || 'Unable to load VM sizes');
+          throw new Error(
+            body.error || 'Unable to load VM size details',
+          );
         }
 
-        const sizes = body.value || [];
-        setVmSizes(sizes);
-        setVmSizeMessage(body.pricingNote || '');
+        const details = (body.value || []) as VmSize[];
 
-        if (
-          sizes.length > 0 &&
-          !sizes.some((size: VmSize) => size.name === form.vmSize)
-        ) {
-          setForm(current => ({
-            ...current,
-            vmSize: sizes[0].name,
-          }));
+        if (details.length > 0) {
+          setVmSizes(current =>
+            current.map(item => {
+              const match = details.find(
+                detail => detail.name === item.name,
+              );
+              return match || item;
+            }),
+          );
         }
+
+        setVmSizeMessage(
+          body.pricingNote ||
+            'Retail compute estimate only; additional Azure charges may apply.',
+        );
       })
-      .catch(err => {
-        setVmSizes([]);
-        setVmSizeMessage(String(err));
+      .catch(() => {
+        setVmSizeMessage(
+          'CPU, RAM and pricing details are temporarily unavailable. VM size selection is still available.',
+        );
       })
       .finally(() => setVmSizesLoading(false));
   }, [fetchApi, service, activeSubscription, form.location]);
@@ -818,32 +843,22 @@ export const SelfServicePage = () => {
                 <div style={grid}>
                   <div>
                     <label style={label}>VM Size</label>
-                    {vmSizesLoading ? (
-                      <Progress />
-                    ) : (
-                      <select
-                        style={input}
-                        value={form.vmSize}
-                        onChange={event =>
-                          setForm({
-                            ...form,
-                            vmSize: event.target.value,
-                          })
-                        }
-                      >
-                        {vmSizes.length === 0 ? (
-                          <option value="">
-                            No approved VM sizes available
-                          </option>
-                        ) : (
-                          vmSizes.map(size => (
-                            <option key={size.name} value={size.name}>
-                              {size.name}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    )}
+                    <select
+                      style={input}
+                      value={form.vmSize}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          vmSize: event.target.value,
+                        })
+                      }
+                    >
+                      {vmSizes.map(size => (
+                        <option key={size.name} value={size.name}>
+                          {size.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -886,8 +901,10 @@ export const SelfServicePage = () => {
                       </div>
                     </div>
                     <div style={{ marginTop: 10, fontSize: 12 }}>
-                      {vmSizeMessage ||
-                        'Retail compute estimate only; additional Azure charges may apply.'}
+                      {vmSizesLoading
+                        ? 'Loading CPU, RAM and pricing details...'
+                        : vmSizeMessage ||
+                          'Retail compute estimate only; additional Azure charges may apply.'}
                     </div>
                   </div>
                 )}
