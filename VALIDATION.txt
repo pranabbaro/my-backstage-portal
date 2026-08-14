@@ -1,10 +1,23 @@
-V9 VALIDATION
-Subscription routing preserved: PASS
-Existing RG user filtering: PASS
-New RG unrestricted for end-user visibility: PASS
-Managed Identity deployment preserved: PASS
-VM vCPU/RAM discovery: PASS
-Azure Retail Prices integration: PASS
-Static import validation: PASS
-Preparation fixture: PASS
-Workflow YAML parse: PASS
+V9.1 VALIDATION
+===============
+Current GitHub TS2677 vmCatalog error: FIXED
+
+Fix applied:
+- Promise callback explicitly returns Promise<VmSizeOption | null>: PASS
+- Returned SKU name normalized to string: PASS
+- Null filtering predicate now operates on VmSizeOption | null: PASS
+
+Preserved V9 functionality:
+- Existing RG user filtering: PASS
+- New RG has no end-user RG restriction: PASS
+- Managed Identity remains deployment identity: PASS
+- Subscription routing unchanged: PASS
+- Business Managed subscription behavior unchanged: PASS
+- VNet/Subnet discovery unchanged: PASS
+- VM vCPU/RAM discovery unchanged: PASS
+- Azure Retail Prices cost lookup unchanged: PASS
+
+Safety:
+- Workflow YAML parse: PASS
+- Preparation script syntax: PASS
+- GitHub Actions still runs yarn tsc before build/deploy: PASS

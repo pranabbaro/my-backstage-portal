@@ -177,7 +177,8 @@ export async function listApprovedVmSizes(
   );
 
   const options = await Promise.all(
-    APPROVED_VM_SIZES.map(async name => {
+    APPROVED_VM_SIZES.map(
+      async (name): Promise<VmSizeOption | null> => {
       const sku = skuMap.get(name);
       const available =
         sku && !isRestrictedInLocation(sku, location);
@@ -192,7 +193,7 @@ export async function listApprovedVmSizes(
       const price = await retailPrice(name, location);
 
       return {
-        name,
+        name: String(name),
         vcpus:
           vcpusRaw === undefined ? null : Number(vcpusRaw),
         memoryGB:
@@ -209,7 +210,8 @@ export async function listApprovedVmSizes(
             ? ('Unavailable' as const)
             : ('Azure Retail Prices' as const),
       };
-    }),
+      },
+    ),
   );
 
   return options.filter(
