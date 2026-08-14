@@ -5,8 +5,17 @@ import {
   managedIdentityTenantId,
 } from '../azureClient';
 import { names } from '../naming';
+import {
+  configureKeyVaultPrivateEndpoint,
+  enableKeyVaultServiceEndpoint,
+} from './keyVaultNetworking';
 
 const ALLOWED_SKUS = ['standard', 'premium'] as const;
+const NETWORK_MODES = [
+  'public',
+  'service-endpoint',
+  'private-endpoint',
+] as const;
 
 export async function deployKeyVault(args: {
   subscriptionId: string;
@@ -19,7 +28,10 @@ export async function deployKeyVault(args: {
   sku: string;
   softDeleteRetentionInDays: number;
   purgeProtection: boolean;
-  publicNetworkAccess: string;
+  networkMode: string;
+  trustedServicesBypass: boolean;
+  vnetId?: string;
+  subnetResourceId?: string;
 }) {
   const generated = names(
     args.workload,
@@ -32,6 +44,12 @@ export async function deployKeyVault(args: {
     throw new Error(`Key Vault SKU '${args.sku}' is not approved`);
   }
 
+  if (!NETWORK_MODES.includes(args.networkMode as any)) {
+    throw new Error(
+      `Key Vault network mode '${args.networkMode}' is invalid`,
+    );
+  }
+
   if (
     !Number.isInteger(args.softDeleteRetentionInDays) ||
     args.softDeleteRetentionInDays < 7 ||
@@ -42,8 +60,17 @@ export async function deployKeyVault(args: {
     );
   }
 
-  if (!['Enabled', 'Disabled'].includes(args.publicNetworkAccess)) {
-    throw new Error('Invalid Key Vault public network access option');
+  const requiresNetwork =
+    args.networkMode === 'service-endpoint' ||
+    args.networkMode === 'private-endpoint';
+
+  if (
+    requiresNetwork &&
+    (!args.vnetId || !args.subnetResourceId)
+  ) {
+    throw new Error(
+      'VNet and Subnet are required for the selected Key Vault network mode',
+    );
   }
 
   const resourceGroup =
@@ -63,15 +90,45 @@ export async function deployKeyVault(args: {
     );
   }
 
+  if (
+    args.networkMode === 'service-endpoint' &&
+    args.subnetResourceId
+  ) {
+    await enableKeyVaultServiceEndpoint(
+      args.subnetResourceId,
+    );
+  }
+
   const tenantId = await managedIdentityTenantId();
+
+  const vaultResourceId =
+    `/subscriptions/${args.subscriptionId}` +
+    `/resourceGroups/${resourceGroup}` +
+    `/providers/Microsoft.KeyVault/vaults/` +
+    `${generated.keyVault}`;
+
+  const publicNetworkAccess =
+    args.networkMode === 'private-endpoint'
+      ? 'Disabled'
+      : 'Enabled';
+
+  const defaultAction =
+    args.networkMode === 'public' ? 'Allow' : 'Deny';
+
+  const virtualNetworkRules =
+    args.networkMode === 'service-endpoint' &&
+    args.subnetResourceId
+      ? [
+          {
+            id: args.subnetResourceId,
+            ignoreMissingVnetServiceEndpoint: false,
+          },
+        ]
+      : [];
 
   const result = await arm(
     'PUT',
-    `/subscriptions/${args.subscriptionId}/resourceGroups/${encodeURIComponent(
-      resourceGroup,
-    )}/providers/Microsoft.KeyVault/vaults/${encodeURIComponent(
-      generated.keyVault,
-    )}`,
+    vaultResourceId,
     '2024-11-01',
     {
       location: args.location,
@@ -93,19 +150,46 @@ export async function deployKeyVault(args: {
         softDeleteRetentionInDays:
           args.softDeleteRetentionInDays,
         enablePurgeProtection: args.purgeProtection,
-        publicNetworkAccess: args.publicNetworkAccess,
+        publicNetworkAccess,
         networkAcls: {
-          bypass: 'AzureServices',
-          defaultAction:
-            args.publicNetworkAccess === 'Disabled'
-              ? 'Deny'
-              : 'Allow',
+          bypass: args.trustedServicesBypass
+            ? 'AzureServices'
+            : 'None',
+          defaultAction,
           ipRules: [],
-          virtualNetworkRules: [],
+          virtualNetworkRules,
         },
       },
     },
   );
+
+  let privateEndpoint:
+    | {
+        privateEndpointId: string;
+        privateDnsZoneId: string;
+      }
+    | undefined;
+
+  if (
+    args.networkMode === 'private-endpoint' &&
+    args.subnetResourceId &&
+    args.vnetId
+  ) {
+    privateEndpoint =
+      await configureKeyVaultPrivateEndpoint({
+        subscriptionId: args.subscriptionId,
+        resourceGroup,
+        location: args.location,
+        subnetId: args.subnetResourceId,
+        vnetId: args.vnetId,
+        vaultResourceId,
+        privateEndpointName:
+          generated.keyVaultPrivateEndpoint,
+        connectionName:
+          generated.keyVaultPrivateConnection,
+        dnsLinkName: generated.keyVaultDnsLink,
+      });
+  }
 
   return {
     message: 'Key Vault deployment accepted',
@@ -121,8 +205,12 @@ export async function deployKeyVault(args: {
     softDeleteRetentionInDays:
       args.softDeleteRetentionInDays,
     purgeProtection: args.purgeProtection,
-    publicNetworkAccess: args.publicNetworkAccess,
+    networkMode: args.networkMode,
+    publicNetworkAccess,
+    trustedServicesBypass:
+      args.trustedServicesBypass,
     authorizationModel: 'Azure RBAC',
+    privateEndpoint,
     azure: result.data,
   };
 }

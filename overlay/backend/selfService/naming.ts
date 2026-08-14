@@ -40,5 +40,8 @@ export function names(workloadRaw:string, environmentRaw:string, locationRaw:str
       .replace(/-$/g, '')
       .slice(0,24)
       .replace(/-$/g, ''),
+    keyVaultPrivateEndpoint:`pep-kv-${suffix}`.slice(0,80),
+    keyVaultPrivateConnection:`plc-kv-${suffix}`.slice(0,80),
+    keyVaultDnsLink:`link-kv-${workload}-${ENV[environment]}-${REGION[location]}`.slice(0,80),
   };
 }

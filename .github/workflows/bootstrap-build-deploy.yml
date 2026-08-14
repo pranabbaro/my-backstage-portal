@@ -61,7 +61,8 @@ jobs:
           test -f backstage/packages/backend/src/selfService/services/storageAccount.ts
           test -f backstage/packages/backend/src/selfService/services/appService.ts
           test -f backstage/packages/backend/src/selfService/services/keyVault.ts
-          echo "V10.4 resource service modules present."
+          test -f backstage/packages/backend/src/selfService/services/keyVaultNetworking.ts
+          echo "V10.6 resource service modules present."
 
           if [ -d backstage/packages/backend/src/selfService/discovery/network ]; then
             echo "ERROR: legacy discovery/network directory still exists"

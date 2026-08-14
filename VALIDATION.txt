@@ -1,24 +1,41 @@
-V10.5 KEY VAULT FRONTEND FIX
-============================
-Current TS2367 error fixed:
-- App Service conditional closes before Key Vault conditional: PASS
-- Key Vault is now a sibling service form: PASS
-- service === 'key-vault' is no longer evaluated inside app-service narrowing: PASS
+V10.6 KEY VAULT NETWORKING VALIDATION
+=====================================
+Baseline V10.5 preserved: PASS
 
-Preserved:
-- Virtual Machine marketplace/form/deployment: PASS
-- Storage Account marketplace/form/deployment: PASS
-- App Service marketplace/form/deployment: PASS
-- Key Vault marketplace/form/deployment: PASS
-- Subscription routing: PASS
-- Existing/New RG: PASS
-- Managed Identity deployment: PASS
-- Naming standards: PASS
-- VM CPU/RAM/cost: PASS
+Key Vault network modes:
+- Public Access: PASS
+- Selected Networks / Service Endpoint: PASS
+- Private Endpoint: PASS
+
+Service Endpoint:
+- Dynamic VNet dropdown: PASS
+- Dynamic Subnet dropdown: PASS
+- Microsoft.KeyVault service endpoint added to subnet: PASS
+- Existing subnet configuration preserved where supported: PASS
+- Key Vault firewall default Deny: PASS
+- Selected subnet added to virtualNetworkRules: PASS
+
+Private Endpoint:
+- Dynamic VNet/Subnet selection: PASS
+- Private endpoint subnet preparation: PASS
+- Microsoft.Network/privateEndpoints deployment: PASS
+- Key Vault groupId 'vault': PASS
+- Public network access disabled on vault: PASS
+- Private DNS zone privatelink.vaultcore.azure.net: PASS
+- Private DNS VNet link: PASS
+- Private DNS zone group on private endpoint: PASS
+
+Shared:
+- Subscription routing preserved: PASS
+- Existing/New RG preserved: PASS
+- Managed Identity deployment preserved: PASS
+- Key Vault RBAC preserved: PASS
+- Soft delete/purge protection preserved: PASS
+- VM/Storage/App Service preserved: PASS
 
 Build safety:
-- Key Vault backend module exists: PASS
-- Router deployment endpoints preserved: PASS
-- Local backend imports resolve: PASS
+- keyVaultNetworking.ts copied by preparation script: PASS
+- Workflow checks networking module: PASS
+- Local TypeScript imports resolve: PASS
 - Workflow YAML parse: PASS
 - Preparation script syntax: PASS

@@ -577,9 +577,21 @@ export function createSelfServiceRouter(
         sku: String(body.sku || 'standard').toLowerCase(),
         softDeleteRetentionInDays: retention,
         purgeProtection,
-        publicNetworkAccess: String(
-          body.publicNetworkAccess || 'Enabled',
+        networkMode: String(
+          body.networkMode || 'public',
         ),
+        trustedServicesBypass:
+          body.trustedServicesBypass === true ||
+          String(body.trustedServicesBypass).toLowerCase() ===
+            'true' ||
+          String(body.trustedServicesBypass).toLowerCase() ===
+            'enabled',
+        vnetId: body.vnetId
+          ? String(body.vnetId)
+          : undefined,
+        subnetResourceId: body.subnetResourceId
+          ? String(body.subnetResourceId)
+          : undefined,
       });
 
       res.json(result);

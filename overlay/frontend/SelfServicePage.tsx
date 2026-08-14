@@ -182,7 +182,8 @@ export const SelfServicePage = () => {
     keyVaultSku: 'standard',
     keyVaultSoftDeleteRetention: '90',
     keyVaultPurgeProtection: 'Enabled',
-    keyVaultPublicNetworkAccess: 'Enabled',
+    keyVaultNetworkMode: 'public',
+    keyVaultTrustedServices: 'Enabled',
   });
 
   const [autoSub, setAutoSub] = useState<Subscription | null>(null);
@@ -327,17 +328,33 @@ export const SelfServicePage = () => {
       .then(body => setRgs(body.value || []))
       .catch(() => setRgs([]));
 
-    if (service === 'vm') {
+    const needsNetworkDiscovery =
+      service === 'vm' ||
+      (service === 'key-vault' &&
+        form.keyVaultNetworkMode !== 'public');
+
+    if (needsNetworkDiscovery) {
       fetchApi
         .fetch(`/api/azure-self-service/network/vnets?${query}`)
         .then(response => response.json())
         .then(body => setVnets(body.value || []))
         .catch(() => setVnets([]));
     }
-  }, [fetchApi, activeSubscription, form.location, service]);
+  }, [
+    fetchApi,
+    activeSubscription,
+    form.location,
+    service,
+    form.keyVaultNetworkMode,
+  ]);
 
   useEffect(() => {
-    if (service !== 'vm' || !form.vnetId) {
+    const needsSubnet =
+      service === 'vm' ||
+      (service === 'key-vault' &&
+        form.keyVaultNetworkMode !== 'public');
+
+    if (!needsSubnet || !form.vnetId) {
       setSubnets([]);
       return;
     }
@@ -356,7 +373,12 @@ export const SelfServicePage = () => {
       .then(response => response.json())
       .then(body => setSubnets(body.value || []))
       .catch(() => setSubnets([]));
-  }, [fetchApi, service, form.vnetId]);
+  }, [
+    fetchApi,
+    service,
+    form.vnetId,
+    form.keyVaultNetworkMode,
+  ]);
 
   useEffect(() => {
     if (service !== 'vm' || !activeSubscription) {
@@ -439,7 +461,13 @@ export const SelfServicePage = () => {
             : service === 'key-vault'
               ? form.keyVaultSku &&
                 form.keyVaultSoftDeleteRetention &&
-                form.keyVaultPublicNetworkAccess
+                form.keyVaultNetworkMode &&
+                (form.keyVaultNetworkMode === 'public'
+                  ? true
+                  : Boolean(
+                      form.vnetId &&
+                        form.subnetResourceId,
+                    ))
               : false),
   );
 
@@ -503,8 +531,17 @@ export const SelfServicePage = () => {
           ),
           purgeProtection:
             form.keyVaultPurgeProtection === 'Enabled',
-          publicNetworkAccess:
-            form.keyVaultPublicNetworkAccess,
+          networkMode: form.keyVaultNetworkMode,
+          trustedServicesBypass:
+            form.keyVaultTrustedServices === 'Enabled',
+          vnetId:
+            form.keyVaultNetworkMode === 'public'
+              ? undefined
+              : form.vnetId,
+          subnetResourceId:
+            form.keyVaultNetworkMode === 'public'
+              ? undefined
+              : form.subnetResourceId,
         };
       }
 
@@ -1177,16 +1214,43 @@ export const SelfServicePage = () => {
                   </div>
 
                   <div>
-                    <label style={label}>
-                      Public Network Access
-                    </label>
+                    <label style={label}>Network Access</label>
                     <select
                       style={input}
-                      value={form.keyVaultPublicNetworkAccess}
+                      value={form.keyVaultNetworkMode}
                       onChange={event =>
                         setForm({
                           ...form,
-                          keyVaultPublicNetworkAccess:
+                          keyVaultNetworkMode:
+                            event.target.value,
+                          vnetId: '',
+                          subnetResourceId: '',
+                        })
+                      }
+                    >
+                      <option value="public">
+                        Public Access
+                      </option>
+                      <option value="service-endpoint">
+                        Selected Networks / Service Endpoint
+                      </option>
+                      <option value="private-endpoint">
+                        Private Endpoint
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={label}>
+                      Trusted Microsoft Services
+                    </label>
+                    <select
+                      style={input}
+                      value={form.keyVaultTrustedServices}
+                      onChange={event =>
+                        setForm({
+                          ...form,
+                          keyVaultTrustedServices:
                             event.target.value,
                         })
                       }
@@ -1196,6 +1260,109 @@ export const SelfServicePage = () => {
                     </select>
                   </div>
                 </div>
+
+                {form.keyVaultNetworkMode !== 'public' && (
+                  <>
+                    <h3>Networking</h3>
+                    <div style={grid}>
+                      <div>
+                        <label style={label}>
+                          Virtual Network
+                        </label>
+                        <select
+                          style={input}
+                          value={form.vnetId}
+                          onChange={event =>
+                            setForm({
+                              ...form,
+                              vnetId: event.target.value,
+                              subnetResourceId: '',
+                            })
+                          }
+                        >
+                          <option value="">
+                            Select a VNet
+                          </option>
+                          {vnets.map(vnet => (
+                            <option
+                              key={vnet.id}
+                              value={vnet.id}
+                            >
+                              {vnet.name} — {vnet.resourceGroup}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={label}>Subnet</label>
+                        <select
+                          style={input}
+                          value={form.subnetResourceId}
+                          disabled={!form.vnetId}
+                          onChange={event =>
+                            setForm({
+                              ...form,
+                              subnetResourceId:
+                                event.target.value,
+                            })
+                          }
+                        >
+                          <option value="">
+                            Select a subnet
+                          </option>
+                          {subnets.map(subnet => (
+                            <option
+                              key={subnet.id}
+                              value={subnet.id}
+                            >
+                              {subnet.name}
+                              {subnet.addressPrefixes.length
+                                ? ` — ${subnet.addressPrefixes.join(
+                                    ', ',
+                                  )}`
+                                : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {form.keyVaultNetworkMode ===
+                      'service-endpoint' && (
+                      <div
+                        style={{
+                          ...infoBox,
+                          marginTop: 16,
+                        }}
+                      >
+                        The Microsoft.KeyVault service endpoint
+                        will be enabled on the selected subnet and
+                        the Key Vault firewall will allow that
+                        subnet.
+                      </div>
+                    )}
+
+                    {form.keyVaultNetworkMode ===
+                      'private-endpoint' && (
+                      <div
+                        style={{
+                          ...infoBox,
+                          marginTop: 16,
+                        }}
+                      >
+                        A Key Vault private endpoint and Private DNS
+                        integration for
+                        {' '}
+                        <b>
+                          privatelink.vaultcore.azure.net
+                        </b>
+                        {' '}
+                        will be configured automatically.
+                      </div>
+                    )}
+                  </>
+                )}
 
                 <div style={{ ...infoBox, marginTop: 16 }}>
                   Azure RBAC authorization and soft delete are enabled
