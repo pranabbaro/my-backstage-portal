@@ -68,6 +68,7 @@ type PlatformConfig = {
   managedIdentity?: boolean;
   subscriptionRoutingConfigured?: boolean;
   allowedLocations?: string[];
+  deploymentProvider?: 'direct-arm' | 'github';
 };
 
 const input: React.CSSProperties = {
@@ -616,6 +617,13 @@ export const SelfServicePage = () => {
                 {cfg.subscriptionRoutingConfigured
                   ? 'Ready'
                   : 'Not configured'}
+              </b>
+              {' | '}
+              Deployment engine:{' '}
+              <b>
+                {cfg.deploymentProvider === 'github'
+                  ? 'GitHub IaC'
+                  : 'Direct ARM'}
               </b>
             </div>
           )}

@@ -110,6 +110,10 @@ for forbidden in [
         sys.exit(1)
 
 for required in [
+    target/'deployment/provider.ts',
+    target/'deployment/github.ts',
+    target/'deployment/config.ts',
+    target/'deployment/model.ts',
     target/'services/storageAccount.ts',
     target/'services/appService.ts',
     target/'services/keyVault.ts',

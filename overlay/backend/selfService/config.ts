@@ -1,3 +1,4 @@
+import { currentDeploymentProvider } from './deployment/provider';
 
 const DEFAULT_LOCATIONS=['centralindia','southindia','westindia'];
 
@@ -16,5 +17,6 @@ export function platformStatus() {
       process.env.AZURE_SUBSCRIPTION_ID
     ),
     allowedLocations:allowedLocations(),
+    deploymentProvider:currentDeploymentProvider(),
   };
 }

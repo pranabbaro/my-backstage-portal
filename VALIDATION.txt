@@ -1,41 +1,49 @@
-V10.6 KEY VAULT NETWORKING VALIDATION
-=====================================
-Baseline V10.5 preserved: PASS
+V12 IAC PROVIDER VALIDATION
+============================
+Baseline:
+- Built on V10.6 Key Vault networking: PASS
+- V11 deployment-history changes are NOT included: PASS
 
-Key Vault network modes:
-- Public Access: PASS
-- Selected Networks / Service Endpoint: PASS
-- Private Endpoint: PASS
+Deployment provider:
+- direct-arm default provider: PASS
+- github provider: PASS
+- provider abstraction: PASS
+- GitHub Enterprise API URL configurable: PASS
+- workflow_dispatch request uses single request_json input: PASS
+- GitHub credentials are not used for Azure deployment: PASS
 
-Service Endpoint:
-- Dynamic VNet dropdown: PASS
-- Dynamic Subnet dropdown: PASS
-- Microsoft.KeyVault service endpoint added to subnet: PASS
-- Existing subnet configuration preserved where supported: PASS
-- Key Vault firewall default Deny: PASS
-- Selected subnet added to virtualNetworkRules: PASS
+Portal routes:
+- VM can dispatch to GitHub IaC: PASS
+- Storage Account can dispatch to GitHub IaC: PASS
+- App Service can dispatch to GitHub IaC: PASS
+- Key Vault can dispatch to GitHub IaC: PASS
+- Existing Direct ARM path remains intact: PASS
+- 202 Accepted returned for dispatched IaC requests: PASS
 
-Private Endpoint:
-- Dynamic VNet/Subnet selection: PASS
-- Private endpoint subnet preparation: PASS
-- Microsoft.Network/privateEndpoints deployment: PASS
-- Key Vault groupId 'vault': PASS
-- Public network access disabled on vault: PASS
-- Private DNS zone privatelink.vaultcore.azure.net: PASS
-- Private DNS VNet link: PASS
-- Private DNS zone group on private endpoint: PASS
+Golden IaC:
+- VM Bicep module: PASS
+- Storage Account Bicep module: PASS
+- App Service Bicep module: PASS
+- Key Vault Bicep module: PASS
+- Key Vault service-endpoint preparation: PASS
+- Key Vault Private Endpoint + Private DNS Bicep: PASS
+- approved-module dispatcher script: PASS
 
-Shared:
-- Subscription routing preserved: PASS
-- Existing/New RG preserved: PASS
-- Managed Identity deployment preserved: PASS
-- Key Vault RBAC preserved: PASS
-- Soft delete/purge protection preserved: PASS
-- VM/Storage/App Service preserved: PASS
+GitHub workflow:
+- workflow_dispatch input: PASS
+- request validation: PASS
+- Azure OIDC / workload identity login: PASS
+- Bicep compilation validation: PASS
+- target subscription selected from validated request: PASS
+- approved module deployment: PASS
+
+UI:
+- Deployment engine displayed in Platform readiness: PASS
+- Existing marketplace/forms preserved: PASS
 
 Build safety:
-- keyVaultNetworking.ts copied by preparation script: PASS
-- Workflow checks networking module: PASS
-- Local TypeScript imports resolve: PASS
-- Workflow YAML parse: PASS
-- Preparation script syntax: PASS
+- Backend provider modules copied by preparation script: PASS
+- Backend relative imports resolve: PASS
+- Existing build workflow YAML parse: PASS
+- IaC deployment workflow YAML parse: PASS
+- Python scripts syntax: PASS

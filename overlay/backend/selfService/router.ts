@@ -23,6 +23,7 @@ import {
 import { deployStorageAccount } from './services/storageAccount';
 import { deployAppService } from './services/appService';
 import { deployKeyVault } from './services/keyVault';
+import { dispatchIaCIfConfigured } from './deployment/provider';
 
 function validLocation(raw: string) {
   const value = raw.toLowerCase();
@@ -354,6 +355,42 @@ export function createSelfServiceRouter(
       const vmSize = String(body.vmSize || 'Standard_B2s');
       await assertApprovedVmSize(subscriptionId, location, vmSize);
 
+      const dispatched = await dispatchIaCIfConfigured({
+        serviceType: 'virtual-machine',
+        subscriptionId,
+        resourceGroupMode:
+          resourceGroupMode as 'existing' | 'new',
+        resourceGroup,
+        location,
+        workload: generated.workload,
+        environment: generated.environment,
+        instance: generated.instance,
+        parameters: {
+          virtualMachineName: generated.virtualMachine,
+          networkInterfaceName: generated.networkInterface,
+          vmSize,
+          adminUsername: String(
+            body.adminUsername || 'azureadmin',
+          ),
+          subnetResourceId: subnetId,
+          sshPublicKey,
+          networkType,
+        },
+      });
+
+      if (dispatched) {
+        res.status(202).json({
+          message:
+            'Virtual Machine deployment submitted to approved IaC pipeline',
+          deploymentProvider: dispatched.provider,
+          subscriptionId,
+          resourceGroup,
+          virtualMachineName: generated.virtualMachine,
+          ...dispatched,
+        });
+        return;
+      }
+
       if (resourceGroupMode === 'new') {
         await ensureResourceGroup(
           subscriptionId,
@@ -486,6 +523,56 @@ export function createSelfServiceRouter(
         location,
       );
 
+      const generated = names(
+        String(body.workload || ''),
+        String(body.environment || ''),
+        location,
+        String(body.instance || '01'),
+      );
+
+      const resourceGroupMode = String(
+        body.resourceGroupMode || 'new',
+      ) as 'existing' | 'new';
+
+      const resourceGroup =
+        resourceGroupMode === 'new'
+          ? generated.resourceGroup
+          : String(body.resourceGroup || '').trim();
+
+      const dispatched = await dispatchIaCIfConfigured({
+        serviceType: 'storage-account',
+        subscriptionId,
+        resourceGroupMode,
+        resourceGroup,
+        location,
+        workload: generated.workload,
+        environment: generated.environment,
+        instance: generated.instance,
+        parameters: {
+          storageAccountName: generated.storageAccount,
+          redundancy: String(
+            body.redundancy || 'Standard_LRS',
+          ),
+          accessTier: String(body.accessTier || 'Hot'),
+          publicNetworkAccess: String(
+            body.publicNetworkAccess || 'Enabled',
+          ),
+        },
+      });
+
+      if (dispatched) {
+        res.status(202).json({
+          message:
+            'Storage Account deployment submitted to approved IaC pipeline',
+          deploymentProvider: dispatched.provider,
+          subscriptionId,
+          resourceGroup,
+          storageAccountName: generated.storageAccount,
+          ...dispatched,
+        });
+        return;
+      }
+
       const result = await deployStorageAccount({
         subscriptionId,
         resourceGroupMode: String(body.resourceGroupMode || 'new'),
@@ -519,6 +606,55 @@ export function createSelfServiceRouter(
         userInfo,
         location,
       );
+
+      const generated = names(
+        String(body.workload || ''),
+        String(body.environment || ''),
+        location,
+        String(body.instance || '01'),
+      );
+
+      const resourceGroupMode = String(
+        body.resourceGroupMode || 'new',
+      ) as 'existing' | 'new';
+
+      const resourceGroup =
+        resourceGroupMode === 'new'
+          ? generated.resourceGroup
+          : String(body.resourceGroup || '').trim();
+
+      const dispatched = await dispatchIaCIfConfigured({
+        serviceType: 'app-service',
+        subscriptionId,
+        resourceGroupMode,
+        resourceGroup,
+        location,
+        workload: generated.workload,
+        environment: generated.environment,
+        instance: generated.instance,
+        parameters: {
+          appServiceName: generated.appService,
+          appServicePlanName: generated.appServicePlan,
+          planSku: String(body.planSku || 'B1'),
+          runtime: String(body.runtime || 'NODE|22-lts'),
+          publicNetworkAccess: String(
+            body.publicNetworkAccess || 'Enabled',
+          ),
+        },
+      });
+
+      if (dispatched) {
+        res.status(202).json({
+          message:
+            'App Service deployment submitted to approved IaC pipeline',
+          deploymentProvider: dispatched.provider,
+          subscriptionId,
+          resourceGroup,
+          appServiceName: generated.appService,
+          ...dispatched,
+        });
+        return;
+      }
 
       const result = await deployAppService({
         subscriptionId,
@@ -563,6 +699,77 @@ export function createSelfServiceRouter(
         body.purgeProtection === true ||
         String(body.purgeProtection).toLowerCase() === 'true' ||
         String(body.purgeProtection).toLowerCase() === 'enabled';
+
+      const generated = names(
+        String(body.workload || ''),
+        String(body.environment || ''),
+        location,
+        String(body.instance || '01'),
+      );
+
+      const resourceGroupMode = String(
+        body.resourceGroupMode || 'new',
+      ) as 'existing' | 'new';
+
+      const resourceGroup =
+        resourceGroupMode === 'new'
+          ? generated.resourceGroup
+          : String(body.resourceGroup || '').trim();
+
+      const dispatched = await dispatchIaCIfConfigured({
+        serviceType: 'key-vault',
+        subscriptionId,
+        resourceGroupMode,
+        resourceGroup,
+        location,
+        workload: generated.workload,
+        environment: generated.environment,
+        instance: generated.instance,
+        parameters: {
+          keyVaultName: generated.keyVault,
+          sku: String(
+            body.sku || 'standard',
+          ).toLowerCase(),
+          softDeleteRetentionInDays: retention,
+          purgeProtection,
+          networkMode: String(
+            body.networkMode || 'public',
+          ),
+          trustedServicesBypass:
+            body.trustedServicesBypass === true ||
+            String(
+              body.trustedServicesBypass,
+            ).toLowerCase() === 'true' ||
+            String(
+              body.trustedServicesBypass,
+            ).toLowerCase() === 'enabled',
+          vnetId: body.vnetId
+            ? String(body.vnetId)
+            : '',
+          subnetResourceId: body.subnetResourceId
+            ? String(body.subnetResourceId)
+            : '',
+          privateEndpointName:
+            generated.keyVaultPrivateEndpoint,
+          privateConnectionName:
+            generated.keyVaultPrivateConnection,
+          privateDnsLinkName:
+            generated.keyVaultDnsLink,
+        },
+      });
+
+      if (dispatched) {
+        res.status(202).json({
+          message:
+            'Key Vault deployment submitted to approved IaC pipeline',
+          deploymentProvider: dispatched.provider,
+          subscriptionId,
+          resourceGroup,
+          keyVaultName: generated.keyVault,
+          ...dispatched,
+        });
+        return;
+      }
 
       const result = await deployKeyVault({
         subscriptionId,

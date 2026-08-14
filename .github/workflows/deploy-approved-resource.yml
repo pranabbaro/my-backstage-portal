@@ -1,0 +1,78 @@
+name: Deploy Approved Azure Resource
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_json:
+        description: Validated Self-Service IaC request
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout IaC repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment request
+        shell: bash
+        env:
+          REQUEST_JSON: ${{ inputs.request_json }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          r = json.loads(os.environ["REQUEST_JSON"])
+          required = [
+              "serviceType",
+              "subscriptionId",
+              "resourceGroupMode",
+              "resourceGroup",
+              "location",
+              "parameters",
+          ]
+          missing = [x for x in required if x not in r]
+          if missing:
+              raise SystemExit(f"Missing request fields: {missing}")
+          print("Validated service:", r["serviceType"])
+          print("Target RG:", r["resourceGroup"])
+          PY
+
+      - name: Read target subscription
+        id: request
+        shell: bash
+        env:
+          REQUEST_JSON: ${{ inputs.request_json }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          r = json.loads(os.environ["REQUEST_JSON"])
+          print(f"subscription_id={r['subscriptionId']}")
+          PY
+
+      - name: Azure login using workload identity federation
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ steps.request.outputs.subscription_id }}
+
+      - name: Validate Bicep
+        shell: bash
+        run: |
+          az bicep version
+          for file in iac/modules/*/main.bicep; do
+            echo "Building $file"
+            az bicep build --file "$file" --stdout > /dev/null
+          done
+
+      - name: Deploy approved module
+        shell: bash
+        env:
+          REQUEST_JSON: ${{ inputs.request_json }}
+        run: python3 iac/scripts/deploy.py
