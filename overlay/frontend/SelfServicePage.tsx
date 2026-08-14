@@ -13,6 +13,7 @@ import {
 } from '@backstage/frontend-plugin-api';
 
 type ServiceType = 'vm' | 'storage' | 'app-service' | 'key-vault';
+type TargetPlatform = 'azure' | 'aws' | 'gcp' | 'azure-local' | 'hyperv';
 type NetworkType =
   | 'internal'
   | 'intranet'
@@ -149,6 +150,7 @@ function money(value: number | null) {
 export const SelfServicePage = () => {
   const fetchApi = useApi(fetchApiRef);
 
+  const [platform, setPlatform] = useState<TargetPlatform>('azure');
   const [service, setService] = useState<ServiceType | null>(null);
   const [cfg, setCfg] = useState<PlatformConfig | null>(null);
   const [busy, setBusy] = useState(false);
@@ -629,6 +631,52 @@ export const SelfServicePage = () => {
           )}
         </InfoCard>
 
+        <div style={{ marginTop: 28 }}>
+          <h2 style={{ marginBottom: 8 }}>Target Platform</h2>
+          <div style={grid}>
+            {[
+              ['azure', 'Microsoft Azure', 'Available'],
+              ['aws', 'Amazon Web Services', 'Foundation ready'],
+              ['gcp', 'Google Cloud', 'Foundation ready'],
+              ['azure-local', 'Azure Local', 'Foundation ready'],
+              ['hyperv', 'Hyper-V', 'Foundation ready'],
+            ].map(([id, title, state]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setPlatform(id as TargetPlatform);
+                  setService(null);
+                  setStatus(null);
+                }}
+                style={{
+                  textAlign: 'left',
+                  padding: 16,
+                  background: '#fff',
+                  border:
+                    platform === id
+                      ? '2px solid #0078d4'
+                      : '1px solid #d7d7d7',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 17 }}>{title}</div>
+                <div style={{ marginTop: 5, fontSize: 12 }}>{state}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {platform !== 'azure' && (
+          <div style={{ ...infoBox, marginTop: 18 }}>
+            The orchestration foundation for this platform is ready. Its approved
+            service catalog and deployment adapter will be added without changing
+            the common Self-Service contract.
+          </div>
+        )}
+
+        {platform === 'azure' && (
+          <>
         <div style={{ marginTop: 28 }}>
           <h1 style={{ marginBottom: 6 }}>Azure Marketplace</h1>
           <div>
@@ -1419,6 +1467,8 @@ export const SelfServicePage = () => {
               </pre>
             )}
           </div>
+        )}
+          </>
         )}
       </Content>
     </Page>

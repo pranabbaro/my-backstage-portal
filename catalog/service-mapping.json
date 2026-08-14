@@ -1,0 +1,12 @@
+{
+  "azure": {
+    "virtual-machine": "iac/azure/modules/virtual-machine/main.bicep",
+    "storage-account": "iac/azure/modules/storage-account/main.bicep",
+    "app-service": "iac/azure/modules/app-service/main.bicep",
+    "key-vault": "iac/azure/modules/key-vault/main.bicep"
+  },
+  "aws": {},
+  "gcp": {},
+  "azure-local": {},
+  "hyperv": {}
+}

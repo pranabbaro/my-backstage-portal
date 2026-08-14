@@ -1,0 +1,45 @@
+{
+  "platforms": [
+    {
+      "id": "azure",
+      "displayName": "Microsoft Azure",
+      "enabled": true,
+      "deploymentModes": [
+        "direct-arm",
+        "github-iac"
+      ]
+    },
+    {
+      "id": "aws",
+      "displayName": "Amazon Web Services",
+      "enabled": false,
+      "deploymentModes": [
+        "github-iac"
+      ]
+    },
+    {
+      "id": "gcp",
+      "displayName": "Google Cloud",
+      "enabled": false,
+      "deploymentModes": [
+        "github-iac"
+      ]
+    },
+    {
+      "id": "azure-local",
+      "displayName": "Azure Local",
+      "enabled": false,
+      "deploymentModes": [
+        "github-iac"
+      ]
+    },
+    {
+      "id": "hyperv",
+      "displayName": "Hyper-V",
+      "enabled": false,
+      "deploymentModes": [
+        "github-iac"
+      ]
+    }
+  ]
+}

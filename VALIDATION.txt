@@ -1,49 +1,22 @@
-V12 IAC PROVIDER VALIDATION
-============================
-Baseline:
-- Built on V10.6 Key Vault networking: PASS
-- V11 deployment-history changes are NOT included: PASS
+V13 HYBRID ORCHESTRATOR VALIDATION
+=================================
+Baseline V12 preserved: PASS
+Azure Direct ARM preserved: PASS
+Azure GitHub IaC preserved: PASS
+Common TargetPlatform contract: PASS
+Azure registered/enabled: PASS
+AWS registered/foundation: PASS
+GCP registered/foundation: PASS
+Azure Local registered/foundation: PASS
+Hyper-V registered/foundation: PASS
+Generic target envelope: PASS
+Platform selector UI: PASS
+Azure service catalog available: PASS
+IaC repository restructured by platform: PASS
+Platform-aware GitHub workflow: PASS
+Platform-aware dispatcher: PASS
+Backend imports: PASS
+Workflow YAML: PASS
+Python syntax: PASS
 
-Deployment provider:
-- direct-arm default provider: PASS
-- github provider: PASS
-- provider abstraction: PASS
-- GitHub Enterprise API URL configurable: PASS
-- workflow_dispatch request uses single request_json input: PASS
-- GitHub credentials are not used for Azure deployment: PASS
-
-Portal routes:
-- VM can dispatch to GitHub IaC: PASS
-- Storage Account can dispatch to GitHub IaC: PASS
-- App Service can dispatch to GitHub IaC: PASS
-- Key Vault can dispatch to GitHub IaC: PASS
-- Existing Direct ARM path remains intact: PASS
-- 202 Accepted returned for dispatched IaC requests: PASS
-
-Golden IaC:
-- VM Bicep module: PASS
-- Storage Account Bicep module: PASS
-- App Service Bicep module: PASS
-- Key Vault Bicep module: PASS
-- Key Vault service-endpoint preparation: PASS
-- Key Vault Private Endpoint + Private DNS Bicep: PASS
-- approved-module dispatcher script: PASS
-
-GitHub workflow:
-- workflow_dispatch input: PASS
-- request validation: PASS
-- Azure OIDC / workload identity login: PASS
-- Bicep compilation validation: PASS
-- target subscription selected from validated request: PASS
-- approved module deployment: PASS
-
-UI:
-- Deployment engine displayed in Platform readiness: PASS
-- Existing marketplace/forms preserved: PASS
-
-Build safety:
-- Backend provider modules copied by preparation script: PASS
-- Backend relative imports resolve: PASS
-- Existing build workflow YAML parse: PASS
-- IaC deployment workflow YAML parse: PASS
-- Python scripts syntax: PASS
+AWS/GCP/Azure Local/Hyper-V are deliberately not deployable yet until their approved adapters are implemented and tested.

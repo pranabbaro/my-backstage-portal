@@ -356,11 +356,17 @@ export function createSelfServiceRouter(
       await assertApprovedVmSize(subscriptionId, location, vmSize);
 
       const dispatched = await dispatchIaCIfConfigured({
+        platform: 'azure',
         serviceType: 'virtual-machine',
         subscriptionId,
         resourceGroupMode:
           resourceGroupMode as 'existing' | 'new',
         resourceGroup,
+        target: {
+          subscriptionId,
+          resourceGroupMode,
+          resourceGroup,
+        },
         location,
         workload: generated.workload,
         environment: generated.environment,
@@ -540,10 +546,16 @@ export function createSelfServiceRouter(
           : String(body.resourceGroup || '').trim();
 
       const dispatched = await dispatchIaCIfConfigured({
+        platform: 'azure',
         serviceType: 'storage-account',
         subscriptionId,
         resourceGroupMode,
         resourceGroup,
+        target: {
+          subscriptionId,
+          resourceGroupMode,
+          resourceGroup,
+        },
         location,
         workload: generated.workload,
         environment: generated.environment,
@@ -624,10 +636,16 @@ export function createSelfServiceRouter(
           : String(body.resourceGroup || '').trim();
 
       const dispatched = await dispatchIaCIfConfigured({
+        platform: 'azure',
         serviceType: 'app-service',
         subscriptionId,
         resourceGroupMode,
         resourceGroup,
+        target: {
+          subscriptionId,
+          resourceGroupMode,
+          resourceGroup,
+        },
         location,
         workload: generated.workload,
         environment: generated.environment,
@@ -717,10 +735,16 @@ export function createSelfServiceRouter(
           : String(body.resourceGroup || '').trim();
 
       const dispatched = await dispatchIaCIfConfigured({
+        platform: 'azure',
         serviceType: 'key-vault',
         subscriptionId,
         resourceGroupMode,
         resourceGroup,
+        target: {
+          subscriptionId,
+          resourceGroupMode,
+          resourceGroup,
+        },
         location,
         workload: generated.workload,
         environment: generated.environment,

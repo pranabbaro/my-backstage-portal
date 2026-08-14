@@ -38,10 +38,10 @@ The workflow takes the target subscription from the validated request.
 
 The repository includes:
 
-iac/modules/virtual-machine/main.bicep
-iac/modules/storage-account/main.bicep
-iac/modules/app-service/main.bicep
-iac/modules/key-vault/main.bicep
+iac/azure/modules/virtual-machine/main.bicep
+iac/azure/modules/storage-account/main.bicep
+iac/azure/modules/app-service/main.bicep
+iac/azure/modules/key-vault/main.bicep
 iac/scripts/deploy.py
 .github/workflows/deploy-approved-resource.yml
 

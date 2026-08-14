@@ -1,81 +1,56 @@
-
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 APPROVED = {
-    "virtual-machine": "modules/virtual-machine/main.bicep",
-    "storage-account": "modules/storage-account/main.bicep",
-    "app-service": "modules/app-service/main.bicep",
-    "key-vault": "modules/key-vault/main.bicep",
+    ('azure', 'virtual-machine'): 'iac/azure/modules/virtual-machine/main.bicep',
+    ('azure', 'storage-account'): 'iac/azure/modules/storage-account/main.bicep',
+    ('azure', 'app-service'): 'iac/azure/modules/app-service/main.bicep',
+    ('azure', 'key-vault'): 'iac/azure/modules/key-vault/main.bicep',
 }
 
 def run(args):
-    print("+", " ".join(args))
+    print('+', ' '.join(args))
     subprocess.run(args, check=True)
 
+def deploy_azure(request):
+    service = request['serviceType']
+    key = ('azure', service)
+    if key not in APPROVED:
+        raise SystemExit(f'Unsupported Azure serviceType: {service}')
+    target = request.get('target') or {}
+    subscription = target.get('subscriptionId') or request.get('subscriptionId')
+    rg = target.get('resourceGroup') or request.get('resourceGroup')
+    rg_mode = target.get('resourceGroupMode') or request.get('resourceGroupMode')
+    location = request['location']
+    params = dict(request.get('parameters') or {})
+    if not subscription or not rg:
+        raise SystemExit('Azure target requires subscriptionId and resourceGroup')
+    run(['az','account','set','--subscription',subscription])
+    if rg_mode == 'new':
+        run(['az','group','create','--name',rg,'--location',location])
+    if service == 'key-vault' and params.get('networkMode') == 'service-endpoint':
+        subnet_id=params.get('subnetResourceId')
+        if not subnet_id: raise SystemExit('subnetResourceId is required for service-endpoint')
+        run(['az','network','vnet','subnet','update','--ids',subnet_id,'--service-endpoints','Microsoft.KeyVault'])
+    if service == 'key-vault':
+        tenant=subprocess.check_output(['az','account','show','--query','tenantId','-o','tsv'],text=True).strip()
+        params['tenantId']=tenant
+    params['location']=location
+    parameter_file=Path('/tmp/iac-parameters.json')
+    parameter_file.write_text(json.dumps({'$schema':'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#','contentVersion':'1.0.0.0','parameters':{k:{'value':v} for k,v in params.items()}}))
+    run(['az','deployment','group','create','--resource-group',rg,'--template-file',APPROVED[key],'--parameters',f'@{parameter_file}','--name',f'backstage-{service}'])
+
 def main():
-    raw = os.environ["REQUEST_JSON"]
-    request = json.loads(raw)
+    request=json.loads(os.environ['REQUEST_JSON'])
+    platform=request.get('platform')
+    if platform == 'azure':
+        deploy_azure(request)
+        return
+    if platform in {'aws','gcp','azure-local','hyperv'}:
+        raise SystemExit(f"Platform '{platform}' is registered but its approved deployment adapter is not enabled yet")
+    raise SystemExit(f'Unsupported platform: {platform}')
 
-    service = request["serviceType"]
-    if service not in APPROVED:
-        raise SystemExit(f"Unsupported serviceType: {service}")
-
-    subscription = request["subscriptionId"]
-    rg = request["resourceGroup"]
-    rg_mode = request["resourceGroupMode"]
-    location = request["location"]
-    params = dict(request.get("parameters") or {})
-
-    run(["az", "account", "set", "--subscription", subscription])
-
-    if rg_mode == "new":
-        run(["az", "group", "create", "--name", rg, "--location", location])
-
-    # Key Vault service-endpoint mode needs a safe subnet update before the
-    # Bicep module adds the Key Vault VNet firewall rule.
-    if service == "key-vault" and params.get("networkMode") == "service-endpoint":
-        subnet_id = params.get("subnetResourceId")
-        if not subnet_id:
-            raise SystemExit("subnetResourceId is required for service-endpoint")
-        run([
-            "az", "network", "vnet", "subnet", "update",
-            "--ids", subnet_id,
-            "--service-endpoints", "Microsoft.KeyVault",
-        ])
-
-    # Key Vault needs tenantId; get it from the logged-in federated identity.
-    if service == "key-vault":
-        tenant = subprocess.check_output(
-            ["az", "account", "show", "--query", "tenantId", "-o", "tsv"],
-            text=True,
-        ).strip()
-        params["tenantId"] = tenant
-
-    params["location"] = location
-
-    parameter_file = Path("/tmp/iac-parameters.json")
-    parameter_file.write_text(json.dumps({
-        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
-        "contentVersion": "1.0.0.0",
-        "parameters": {
-            key: {"value": value}
-            for key, value in params.items()
-        },
-    }))
-
-    template = Path("iac") / APPROVED[service]
-
-    run([
-        "az", "deployment", "group", "create",
-        "--resource-group", rg,
-        "--template-file", str(template),
-        "--parameters", f"@{parameter_file}",
-        "--name", f"backstage-{service}",
-    ])
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

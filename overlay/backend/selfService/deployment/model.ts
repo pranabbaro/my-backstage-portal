@@ -1,6 +1,13 @@
 
 export type DeploymentProviderName = 'direct-arm' | 'github';
 
+export type TargetPlatform =
+  | 'azure'
+  | 'aws'
+  | 'gcp'
+  | 'azure-local'
+  | 'hyperv';
+
 export type IaCServiceType =
   | 'virtual-machine'
   | 'storage-account'
@@ -8,15 +15,17 @@ export type IaCServiceType =
   | 'key-vault';
 
 export type IaCDeploymentRequest = {
-  serviceType: IaCServiceType;
-  subscriptionId: string;
-  resourceGroupMode: 'existing' | 'new';
-  resourceGroup: string;
+  platform: TargetPlatform;
+  serviceType: IaCServiceType | string;
+  environment: string;
   location: string;
   workload: string;
-  environment: string;
   instance: string;
+  target: Record<string, unknown>;
   parameters: Record<string, unknown>;
+  subscriptionId?: string;
+  resourceGroupMode?: 'existing' | 'new';
+  resourceGroup?: string;
 };
 
 export type DispatchedDeployment = {
