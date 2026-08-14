@@ -123,7 +123,7 @@ if 'SelfServiceLogger' not in types_text:
     print('ERROR: types.ts does not export SelfServiceLogger')
     sys.exit(1)
 
-print('V8.2 shared Self-Service type contract verified.')
+print('V9 shared Self-Service type contract verified.')
 
 idx=(backend/'index.ts').read_text()
 impb="import selfServicePlugin from './selfServicePlugin';"
@@ -140,4 +140,4 @@ pkg.setdefault('dependencies',{}).setdefault('express','^4.21.2')
 pkg.setdefault('devDependencies',{}).setdefault('@types/express','^4.17.23')
 pkgp.write_text(json.dumps(pkg,indent=2)+'\n')
 
-print('V8 Self-Service applied')
+print('V9 Self-Service applied')

@@ -1,4 +1,4 @@
-name: Build and Deploy Backstage Self-Service V8
+name: Build and Deploy Backstage Self-Service V9
 
 on:
   push:
@@ -42,7 +42,7 @@ jobs:
           echo "Remaining V8 overlay files:"
           find overlay/backend/selfService -maxdepth 3 -type f | sort
 
-      - name: Apply V8.1 Self-Service source
+      - name: Apply V9 Self-Service source
         run: python3 scripts/prepare_self_service_v8.py
 
       - name: Verify no legacy Self-Service TypeScript remains
@@ -85,7 +85,7 @@ jobs:
             exit 1
           fi
 
-          echo "V8.2 shared type contract verified."
+          echo "V9 shared type contract verified."
 
       - name: Force safe runtime configuration
         shell: bash

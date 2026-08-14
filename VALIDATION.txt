@@ -1,21 +1,10 @@
-V8.2 FIX VALIDATION
-===================
-Current GitHub error fixed:
-- azureClient.ts imports JsonRecord: PRESENT
-- types.ts exports JsonRecord: PASS
-- types.ts exports SelfServiceLogger: PASS
-
-Additional checks:
-- All local backend TypeScript imports resolve to files: PASS
-- Legacy V6/V7 services absent: PASS
-- Legacy validation.ts absent: PASS
-- Multi-subscription routing preserved: PASS
-- Business Managed entitlement logic preserved: PASS
-- Existing/New Resource Group logic preserved: PASS
-- VNet/Subnet discovery preserved: PASS
-- Preparation script checks JsonRecord type contract: PASS
-- Workflow checks JsonRecord type contract before yarn tsc: PASS
-- GitHub Actions YAML parse: PASS
-- Preparation script syntax: PASS
-
-GitHub Actions will still run the complete yarn tsc against the actual Backstage dependency graph before build/deploy.
+V9 VALIDATION
+Subscription routing preserved: PASS
+Existing RG user filtering: PASS
+New RG unrestricted for end-user visibility: PASS
+Managed Identity deployment preserved: PASS
+VM vCPU/RAM discovery: PASS
+Azure Retail Prices integration: PASS
+Static import validation: PASS
+Preparation fixture: PASS
+Workflow YAML parse: PASS
