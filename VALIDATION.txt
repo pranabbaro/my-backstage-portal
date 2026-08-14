@@ -1,38 +1,24 @@
-V10.4 KEY VAULT VALIDATION
-==========================
-Baseline:
-- Built from V10.3 (V11 not included): PASS
+V10.5 KEY VAULT FRONTEND FIX
+============================
+Current TS2367 error fixed:
+- App Service conditional closes before Key Vault conditional: PASS
+- Key Vault is now a sibling service form: PASS
+- service === 'key-vault' is no longer evaluated inside app-service narrowing: PASS
 
-Marketplace:
-- Virtual Machine: PASS
-- Storage Account: PASS
-- App Service: PASS
-- Key Vault: PASS
-
-Shared Key Vault placement:
-- Existing/New Resource Group: PASS
-- Existing subscription routing preserved: PASS
-- Business Managed path preserved: PASS
-- Managed Identity performs deployment: PASS
-- Central naming standard: PASS
-
-Key Vault-specific properties:
-- Standard/Premium SKU: PASS
-- Soft-delete retention 7/30/90 days: PASS
-- Purge protection Enabled/Disabled: PASS
-- Public network access Enabled/Disabled: PASS
-- Azure RBAC authorization enforced: PASS
-- Soft delete enforced: PASS
-- Empty access-policy list with RBAC model: PASS
-
-Azure integration:
-- Microsoft.KeyVault/vaults API 2024-11-01: PASS
-- Tenant ID resolved from AZURE_TENANT_ID when supplied, otherwise Managed Identity token tid claim: PASS
-- Key Vault name constrained to <=24 characters: PASS
+Preserved:
+- Virtual Machine marketplace/form/deployment: PASS
+- Storage Account marketplace/form/deployment: PASS
+- App Service marketplace/form/deployment: PASS
+- Key Vault marketplace/form/deployment: PASS
+- Subscription routing: PASS
+- Existing/New RG: PASS
+- Managed Identity deployment: PASS
+- Naming standards: PASS
+- VM CPU/RAM/cost: PASS
 
 Build safety:
-- Key Vault service module copied by preparation script: PASS
-- Workflow verifies keyVault.ts exists: PASS
-- Local backend TypeScript imports resolve: PASS
-- Workflow YAML parses: PASS
+- Key Vault backend module exists: PASS
+- Router deployment endpoints preserved: PASS
+- Local backend imports resolve: PASS
+- Workflow YAML parse: PASS
 - Preparation script syntax: PASS

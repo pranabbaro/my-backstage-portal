@@ -1105,6 +1105,8 @@ export const SelfServicePage = () => {
                   HTTPS only, TLS 1.2 minimum, FTPS disabled, and a
                   System-Assigned Managed Identity are enforced automatically.
                 </div>
+              </>
+            )}
 
             {service === 'key-vault' && (
               <>
@@ -1199,9 +1201,6 @@ export const SelfServicePage = () => {
                   Azure RBAC authorization and soft delete are enabled
                   automatically.
                 </div>
-              </>
-            )}
-
               </>
             )}
 
